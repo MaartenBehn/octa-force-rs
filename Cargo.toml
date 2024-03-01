@@ -1,0 +1,23 @@
+[package]
+name = "octa-force"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4"
+simplelog = "0.11.2"
+glam = { version = "0.22", features = ["serde"] }
+anyhow = "1.0"
+
+fps_clock = "2.0"
+winit = "0.27"
+ash = { version = "0.37", features = ["linked"] }
+ash-window = "0.12"
+raw-window-handle = "0.5"
+gpu-allocator = { version = "0.21", default-features = false, features = ["vulkan"] }
+
+imgui = "0.9"
+imgui-winit-support = "0.9"
+imgui-rs-vulkan-renderer = { git = "https://github.com/MaartenBehn/imgui-rs-vulkan-renderer", version = "1.6.1", features = ["gpu-allocator", "dynamic-rendering"] }
