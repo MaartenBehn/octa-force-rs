@@ -6,6 +6,7 @@ use gpu_allocator::{
     vulkan::{Allocation, AllocationCreateDesc, Allocator},
     MemoryLocation,
 };
+use gpu_allocator::vulkan::AllocationScheme;
 use crate::vulkan::align::Align;
 use crate::vulkan::{Context, Device};
 
@@ -33,6 +34,7 @@ impl Buffer {
             requirements,
             location: memory_location,
             linear: true,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
         })?;
 
         unsafe {

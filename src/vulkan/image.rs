@@ -6,6 +6,7 @@ use gpu_allocator::{
     vulkan::{Allocation, AllocationCreateDesc, Allocator},
     MemoryLocation,
 };
+use gpu_allocator::vulkan::AllocationScheme;
 
 use crate::{vulkan::device::Device, Context};
 
@@ -59,6 +60,7 @@ impl Image {
             requirements,
             location: memory_location,
             linear: true,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
         })?;
 
         unsafe {

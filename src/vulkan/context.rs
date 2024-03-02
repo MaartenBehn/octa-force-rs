@@ -171,6 +171,7 @@ impl Context {
                 log_stack_traces: false,
             },
             buffer_device_address: required_device_features.buffer_device_address,
+            allocation_sizes: Default::default(),
         })?;
 
         Ok(Self {

@@ -38,7 +38,6 @@ pub struct BaseApp<B: App> {
     compute_rendering_enabled: bool,
     pub swapchain: Swapchain,
     pub command_pool: CommandPool,
-    pub storage_images: Vec<ImageAndView>,
     command_buffers: Vec<CommandBuffer>,
     in_flight_frames: InFlightFrames,
     pub context: Context,
@@ -58,35 +57,7 @@ pub trait App: Sized {
         controls: &Controls,
     ) -> Result<()>;
 
-    fn record_raytracing_commands(
-        &mut self,
-        base: &BaseApp<Self>,
-        buffer: &CommandBuffer,
-        image_index: usize,
-    ) -> Result<()> {
-        // prevents reports of unused parameters without needing to use #[allow]
-        let _ = base;
-        let _ = buffer;
-        let _ = image_index;
-
-        Ok(())
-    }
-
-    fn record_raster_commands(
-        &mut self,
-        base: &BaseApp<Self>,
-        buffer: &CommandBuffer,
-        image_index: usize,
-    ) -> Result<()> {
-        // prevents reports of unused parameters without needing to use #[allow]
-        let _ = base;
-        let _ = buffer;
-        let _ = image_index;
-
-        Ok(())
-    }
-
-    fn record_compute_commands(
+    fn record_render_commands(
         &mut self,
         base: &BaseApp<Self>,
         buffer: &CommandBuffer,
@@ -298,17 +269,6 @@ impl<B: App> BaseApp<B> {
             window.inner_size().height,
         )?;
 
-        let storage_images = if enable_raytracing || enabled_compute_rendering {
-            create_storage_images(
-                &mut context,
-                swapchain.format,
-                swapchain.extent,
-                swapchain.images.len(),
-            )?
-        } else {
-            vec![]
-        };
-
         let command_buffers = create_command_buffers(&command_pool, &swapchain)?;
 
         let in_flight_frames = InFlightFrames::new(&context, IN_FLIGHT_FRAMES)?;
@@ -320,7 +280,6 @@ impl<B: App> BaseApp<B> {
             context,
             command_pool,
             swapchain,
-            storage_images,
             command_buffers,
             in_flight_frames,
         })
@@ -333,18 +292,6 @@ impl<B: App> BaseApp<B> {
 
         // Swapchain and dependent resources
         self.swapchain.resize(&self.context, width, height)?;
-
-        if self.raytracing_enabled || self.compute_rendering_enabled {
-            // Recreate storage image for RT and update descriptor set
-            let storage_images = create_storage_images(
-                &mut self.context,
-                self.swapchain.format,
-                self.swapchain.extent,
-                self.swapchain.images.len(),
-            )?;
-
-            let _ = std::mem::replace(&mut self.storage_images, storage_images);
-        }
 
         Ok(())
     }
@@ -439,96 +386,19 @@ impl<B: App> BaseApp<B> {
         frame_stats: &mut FrameStats,
         window: &Window,
     ) -> Result<()> {
-        let swapchain_image = &self.swapchain.images[image_index];
         let swapchain_image_view = &self.swapchain.views[image_index];
         let buffer = &self.command_buffers[image_index];
 
         buffer.reset()?;
-
         buffer.begin(None)?;
-
         buffer.reset_all_timestamp_queries_from_pool(self.in_flight_frames.timing_query_pool());
-
         buffer.write_timestamp(
             vk::PipelineStageFlags2::NONE,
             self.in_flight_frames.timing_query_pool(),
             0,
         );
 
-        if self.raytracing_enabled {
-            base_app.record_raytracing_commands(self, buffer, image_index)?;
-        }
-
-        if self.compute_rendering_enabled {
-            base_app.record_compute_commands(self, buffer, image_index)?;
-        }
-
-        if self.raytracing_enabled || self.compute_rendering_enabled {
-            let storage_image = &self.storage_images[image_index].image;
-            // Copy ray tracing result into swapchain
-            buffer.pipeline_image_barriers(&[
-                ImageBarrier {
-                    image: swapchain_image,
-                    old_layout: vk::ImageLayout::UNDEFINED,
-                    new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    src_access_mask: vk::AccessFlags2::NONE,
-                    dst_access_mask: vk::AccessFlags2::TRANSFER_WRITE,
-                    src_stage_mask: vk::PipelineStageFlags2::NONE,
-                    dst_stage_mask: vk::PipelineStageFlags2::TRANSFER,
-                },
-                ImageBarrier {
-                    image: storage_image,
-                    old_layout: vk::ImageLayout::GENERAL,
-                    new_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                    src_access_mask: vk::AccessFlags2::SHADER_WRITE,
-                    dst_access_mask: vk::AccessFlags2::TRANSFER_READ,
-                    src_stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER
-                        | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
-                    dst_stage_mask: vk::PipelineStageFlags2::TRANSFER,
-                },
-            ]);
-
-            buffer.copy_image(
-                storage_image,
-                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                swapchain_image,
-                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            );
-
-            buffer.pipeline_image_barriers(&[
-                ImageBarrier {
-                    image: swapchain_image,
-                    old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                    new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                    src_access_mask: vk::AccessFlags2::TRANSFER_WRITE,
-                    dst_access_mask: vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                    src_stage_mask: vk::PipelineStageFlags2::TRANSFER,
-                    dst_stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-                },
-                ImageBarrier {
-                    image: storage_image,
-                    old_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                    new_layout: vk::ImageLayout::GENERAL,
-                    src_access_mask: vk::AccessFlags2::TRANSFER_READ,
-                    dst_access_mask: vk::AccessFlags2::NONE,
-                    src_stage_mask: vk::PipelineStageFlags2::TRANSFER,
-                    dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
-                },
-            ]);
-        } else {
-            buffer.pipeline_image_barriers(&[ImageBarrier {
-                image: swapchain_image,
-                old_layout: vk::ImageLayout::UNDEFINED,
-                new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                src_access_mask: vk::AccessFlags2::NONE,
-                dst_access_mask: vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-                src_stage_mask: vk::PipelineStageFlags2::NONE,
-                dst_stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-            }]);
-        }
-
-        // Rasterization
-        base_app.record_raster_commands(self, buffer, image_index)?;
+        base_app.record_render_commands(self, buffer, image_index)?;
 
         // Main UI
         {
@@ -544,64 +414,16 @@ impl<B: App> BaseApp<B> {
             
             buffer.end_rendering();
         }
-        
-        buffer.pipeline_image_barriers(&[ImageBarrier {
-            image: swapchain_image,
-            old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            new_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-            src_access_mask: vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
-            dst_access_mask: vk::AccessFlags2::COLOR_ATTACHMENT_READ,
-            src_stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-            dst_stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
-        }]);
 
         buffer.write_timestamp(
             vk::PipelineStageFlags2::ALL_COMMANDS,
             self.in_flight_frames.timing_query_pool(),
             1,
         );
-
         buffer.end()?;
 
         Ok(())
     }
-}
-
-fn create_storage_images(
-    context: &mut Context,
-    format: vk::Format,
-    extent: vk::Extent2D,
-    count: usize,
-) -> Result<Vec<ImageAndView>> {
-    let mut images = Vec::with_capacity(count);
-
-    for _ in 0..count {
-        let image = context.create_image(
-            vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::STORAGE,
-            MemoryLocation::GpuOnly,
-            format,
-            extent.width,
-            extent.height,
-        )?;
-
-        let view = image.create_image_view(false)?;
-
-        context.execute_one_time_commands(|cmd_buffer| {
-            cmd_buffer.pipeline_image_barriers(&[ImageBarrier {
-                image: &image,
-                old_layout: vk::ImageLayout::UNDEFINED,
-                new_layout: vk::ImageLayout::GENERAL,
-                src_access_mask: vk::AccessFlags2::NONE,
-                dst_access_mask: vk::AccessFlags2::NONE,
-                src_stage_mask: vk::PipelineStageFlags2::NONE,
-                dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
-            }]);
-        })?;
-
-        images.push(ImageAndView { image, view })
-    }
-
-    Ok(images)
 }
 
 fn create_command_buffers(pool: &CommandPool, swapchain: &Swapchain) -> Result<Vec<CommandBuffer>> {

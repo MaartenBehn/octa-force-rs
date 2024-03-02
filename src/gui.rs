@@ -29,7 +29,6 @@ pub(crate) struct MainGui {
     stats_display_mode: StatsDisplayMode,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StatsDisplayMode {
     None,
@@ -121,7 +120,7 @@ impl MainGui {
 
         self.imgui_platform.prepare_render(&ui, window);
         let draw_data = imgui.render();
-        self.imgui_renderer.cmd_draw(buffer.inner, draw_data, None)?;
+        self.imgui_renderer.cmd_draw(buffer.inner, draw_data, extent, None)?;
 
         self.imgui_context = Some(imgui.suspend());
         Ok(())

@@ -16,8 +16,9 @@ winit = "0.27"
 ash = { version = "0.37", features = ["linked"] }
 ash-window = "0.12"
 raw-window-handle = "0.5"
-gpu-allocator = { version = "0.21", default-features = false, features = ["vulkan"] }
+gpu-allocator = { version = "0.25", default-features = false, features = ["vulkan"] }
 
-imgui = "0.9"
-imgui-winit-support = "0.9"
-imgui-rs-vulkan-renderer = { git = "https://github.com/MaartenBehn/imgui-rs-vulkan-renderer", version = "1.6.1", features = ["gpu-allocator", "dynamic-rendering"] }
+imgui = "0.11.0"
+imgui-winit-support = "0.11.0"
+# imgui-rs-vulkan-renderer = { git = "https://github.com/MaartenBehn/imgui-rs-vulkan-renderer", version = "1.6.1", features = ["gpu-allocator", "dynamic-rendering"] }
+imgui-rs-vulkan-renderer = { path = "../imgui-rs-vulkan-renderer", version = "1.12.0", features = ["gpu-allocator", "dynamic-rendering"] }
