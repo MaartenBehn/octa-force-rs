@@ -105,7 +105,7 @@ impl Context {
 }
 
 impl CommandBuffer {
-    pub fn ready_swapchain_image(&self, swapchain_image: &Image) -> Result<()> {
+    pub fn swapchain_image_render_barrier(&self, swapchain_image: &Image) -> Result<()> {
         self.pipeline_image_barriers(&[ImageBarrier {
             image: swapchain_image,
             old_layout: vk::ImageLayout::UNDEFINED,
@@ -120,7 +120,7 @@ impl CommandBuffer {
     }
 
     // Used with raytracing or compute rendering
-    pub fn ready_swapchain_image_form_storage_image(
+    pub fn swapchain_image_render_barrier_after_copy_form_storage_image(
         &self,
         storage_image: &Image,
         swapchain_image: &Image,
@@ -178,7 +178,7 @@ impl CommandBuffer {
         Ok(())
     }
 
-    pub fn finish_swapchain_image(&self, swapchain_image: &Image) -> Result<()> {
+    pub fn swapchain_image_present_barrier(&self, swapchain_image: &Image) -> Result<()> {
         self.pipeline_image_barriers(&[ImageBarrier {
             image: swapchain_image,
             old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,

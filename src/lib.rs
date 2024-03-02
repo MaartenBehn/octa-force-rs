@@ -12,7 +12,7 @@ pub mod logger;
 mod stats;
 pub mod vulkan;
 
-use crate::gui::{Gui, GuiScreen};
+use crate::gui::{InWorldGui, ScreenGui};
 use crate::stats::{FrameStats, StatsDisplayMode};
 use anyhow::Result;
 use ash::vk::{self};
@@ -37,19 +37,22 @@ const IN_FLIGHT_FRAMES: u32 = 2;
 
 pub struct BaseApp<B: App> {
     phantom: PhantomData<B>,
-    window: Window,
+    
+    pub screen_guis: Vec<ScreenGui>,
+    pub in_world_guis: Vec<InWorldGui>,
+    gui_stats: ScreenGui,
+    frame_stats: FrameStats,
+    stats_display_mode: StatsDisplayMode,
+
+    pub controls: Controls,
+    
     pub swapchain: Swapchain,
     pub command_pool: CommandPool,
-    command_buffers: Vec<CommandBuffer>,
+    pub command_buffers: Vec<CommandBuffer>,
     in_flight_frames: InFlightFrames,
     pub context: Context,
 
-    pub controls: Controls,
-    frame_stats: FrameStats,
-
-    pub guis: Vec<Gui>,
-    gui_stats: GuiScreen,
-    statsmode: StatsDisplayMode,
+    window: Window,
 }
 
 pub trait App: Sized {
@@ -64,13 +67,11 @@ pub trait App: Sized {
 
     fn record_render_commands(
         &mut self,
-        base: &BaseApp<Self>,
-        buffer: &CommandBuffer,
+        base: &mut BaseApp<Self>,
         image_index: usize,
     ) -> Result<()> {
         // prevents reports of unused parameters without needing to use #[allow]
         let _ = base;
-        let _ = buffer;
         let _ = image_index;
 
         Ok(())
@@ -102,7 +103,7 @@ pub fn run<A: App + 'static>(app_name: &str, size: UVec2, enable_raytracing: boo
         // Send Event to every Gui
         base_app.gui_stats.handle_event(&base_app.window, &event);
         base_app
-            .guis
+            .screen_guis
             .iter_mut()
             .for_each(|gui| gui.handle_event(&base_app.window, &event));
 
@@ -129,7 +130,11 @@ pub fn run<A: App + 'static>(app_name: &str, size: UVec2, enable_raytracing: boo
 
                 base_app.gui_stats.update_delta_time(frame_time);
                 base_app
-                    .guis
+                    .screen_guis
+                    .iter_mut()
+                    .for_each(|gui| gui.update_delta_time(frame_time));
+                base_app
+                    .in_world_guis
                     .iter_mut()
                     .for_each(|gui| gui.update_delta_time(frame_time));
             }
@@ -173,7 +178,7 @@ pub fn run<A: App + 'static>(app_name: &str, size: UVec2, enable_raytracing: boo
                 ..
             } => {
                 if key_code == VirtualKeyCode::R && state == ElementState::Pressed {
-                    base_app.statsmode = base_app.statsmode.next();
+                    base_app.stats_display_mode = base_app.stats_display_mode.next();
                 }
             }
             // Mouse
@@ -262,7 +267,7 @@ impl<B: App> BaseApp<B> {
 
         let frame_stats = FrameStats::default();
         let controls = Controls::default();
-        let gui_stats = GuiScreen::new(
+        let gui_stats = ScreenGui::new(
             &context,
             &command_pool,
             &window,
@@ -281,9 +286,10 @@ impl<B: App> BaseApp<B> {
             controls,
             frame_stats,
 
-            guis: Vec::new(),
+            screen_guis: Vec::new(),
+            in_world_guis: Vec::new(),
             gui_stats,
-            statsmode: StatsDisplayMode::Basic,
+            stats_display_mode: StatsDisplayMode::Basic,
         })
     }
 
@@ -366,7 +372,6 @@ impl<B: App> BaseApp<B> {
 
     fn record_command_buffer(&mut self, image_index: usize, base_app: &mut B) -> Result<()> {
         let buffer = &self.command_buffers[image_index];
-
         buffer.reset()?;
         buffer.begin(None)?;
         buffer.reset_all_timestamp_queries_from_pool(self.in_flight_frames.timing_query_pool());
@@ -376,9 +381,10 @@ impl<B: App> BaseApp<B> {
             0,
         );
 
-        base_app.record_render_commands(self, buffer, image_index)?;
+        base_app.record_render_commands(self, image_index)?;
 
-        if self.statsmode != StatsDisplayMode::None {
+        let buffer = &self.command_buffers[image_index];
+        if self.stats_display_mode != StatsDisplayMode::None {
             buffer.begin_rendering(
                 &self.swapchain.views[image_index],
                 None,
@@ -386,15 +392,15 @@ impl<B: App> BaseApp<B> {
                 vk::AttachmentLoadOp::DONT_CARE,
                 None,
             );
-            self.gui_stats.render(buffer, &self.window, |ui: &Ui| {
+            self.gui_stats.draw(buffer, &self.window, |ui: &Ui| {
                 self.frame_stats
-                    .build_perf_ui(ui, self.statsmode, self.swapchain.extent);
+                    .build_perf_ui(ui, self.stats_display_mode, self.swapchain.extent);
                 Ok(())
             })?;
             buffer.end_rendering();
         }
 
-        buffer.finish_swapchain_image(&self.swapchain.images[image_index])?;
+        buffer.swapchain_image_present_barrier(&self.swapchain.images[image_index])?;
         buffer.write_timestamp(
             vk::PipelineStageFlags2::ALL_COMMANDS,
             self.in_flight_frames.timing_query_pool(),

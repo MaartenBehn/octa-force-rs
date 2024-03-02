@@ -1,12 +1,12 @@
 use crate::camera::Camera;
-use crate::vulkan;
+use crate::{App, BaseApp, IN_FLIGHT_FRAMES, vulkan};
 use crate::vulkan::{CommandBuffer, CommandPool};
 use anyhow::Result;
 use ash::vk;
 use ash::vk::{Extent2D, Format};
-use glam::{vec3, Mat4};
+use glam::{vec3, Mat4, Vec3};
 use imgui::{
-    BackendFlags, Condition, ConfigFlags, FontConfig, FontSource, PlatformMonitor,
+    BackendFlags, ConfigFlags, FontConfig, FontSource, PlatformMonitor,
     PlatformViewportBackend, RendererViewportBackend, SuspendedContext, Ui, Viewport,
 };
 use imgui_rs_vulkan_renderer::{DynamicRendering, Options, Renderer};
@@ -15,47 +15,43 @@ use std::ffi::c_void;
 use std::time::Duration;
 use winit::{event::Event, window::Window};
 
-pub enum Gui {
-    Screen(GuiScreen),
-    InWorld(GuiInWorld),
-}
+pub type GuiId = usize;
 
-pub struct GuiScreen {
+pub struct ScreenGui {
     context: Option<SuspendedContext>,
     renderer: Renderer,
     platform: WinitPlatform,
 }
 
-pub struct GuiInWorld {
+pub struct InWorldGui {
     context: Option<SuspendedContext>,
     renderer: Renderer,
+    transform_mats: Vec<Mat4>,
 }
 
-// Called by the Engine
-impl Gui {
-    pub(crate) fn handle_event<T>(&mut self, window: &Window, event: &Event<T>) {
-        match self {
-            Gui::Screen(gui_screen) => gui_screen.handle_event(window, event),
-            _ => {}
-        }
+
+impl<B: App> BaseApp<B> {
+    pub fn add_screen_gui(&mut self) -> Result<GuiId> {
+        let gui = ScreenGui::new(&self.context, &self.command_pool, &self.window, self.swapchain.format, IN_FLIGHT_FRAMES as usize)?;
+        self.screen_guis.push(gui);
+        Ok(self.screen_guis.len() -1)
     }
 
-    pub(crate) fn update_delta_time(&mut self, frame_time: Duration) {
-        match self {
-            Gui::Screen(gui_screen) => gui_screen.update_delta_time(frame_time),
-            Gui::InWorld(gui_in_world) => gui_in_world.update_delta_time(frame_time),
-        }
+    pub fn add_in_world_gui(&mut self) -> Result<GuiId> {
+        let gui = InWorldGui::new(&self.context, &self.command_pool, self.swapchain.format, IN_FLIGHT_FRAMES as usize)?;
+        self.in_world_guis.push(gui);
+        Ok(self.in_world_guis.len() -1)
     }
 }
 
-impl GuiScreen {
+impl ScreenGui {
     pub fn new(
         context: &vulkan::Context,
         command_pool: &CommandPool,
         window: &Window,
         format: Format,
         in_flight_frames: usize,
-    ) -> Result<GuiScreen> {
+    ) -> Result<ScreenGui> {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
 
@@ -98,7 +94,7 @@ impl GuiScreen {
             }),
         )?;
 
-        Ok(GuiScreen {
+        Ok(ScreenGui {
             context: Some(imgui.suspend()),
             renderer,
             platform,
@@ -117,7 +113,7 @@ impl GuiScreen {
         self.context = Some(imgui.suspend());
     }
 
-    pub fn render<F: FnOnce(&Ui) -> Result<()>>(
+    pub fn draw<F: FnOnce(&Ui) -> Result<()>>(
         &mut self,
         buffer: &CommandBuffer,
         window: &Window,
@@ -149,13 +145,20 @@ impl GuiScreen {
 
 struct PlatformBackend {}
 struct RenderBackend {}
-impl GuiInWorld {
+
+#[derive(Debug, Clone, Copy)]
+pub struct InWorldGuiTransform {
+    pos: Vec3,
+    rot: Vec3,
+    scale: Vec3,
+}
+impl InWorldGui {
     pub fn new(
         context: &vulkan::Context,
         command_pool: &CommandPool,
         format: Format,
         in_flight_frames: usize,
-    ) -> Result<GuiInWorld> {
+    ) -> Result<InWorldGui> {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
 
@@ -219,9 +222,10 @@ impl GuiInWorld {
             }),
         )?;
 
-        Ok(GuiInWorld {
+        Ok(InWorldGui {
             context: Some(imgui.suspend()),
             renderer,
+            transform_mats: Vec::new(),
         })
     }
 
@@ -230,8 +234,22 @@ impl GuiInWorld {
         imgui.io_mut().update_delta_time(frame_time);
         self.context = Some(imgui.suspend());
     }
+    
+    pub fn set_transfrom(&mut self, transforms: &Vec<InWorldGuiTransform>) {
+        self.transform_mats.clear();
+        
+        for (i, t) in transforms.iter().enumerate() {
+            let mat = Mat4::from_scale(vec3(1.0, -1.0, 1.0) * 0.01 * t.scale) 
+                * Mat4::from_rotation_x(t.rot.x.to_radians())
+                * Mat4::from_rotation_y(t.rot.y.to_radians())
+                * Mat4::from_rotation_z(t.rot.z.to_radians())
+                * Mat4::from_translation(vec3(-(i as f32), 0.0, 0.0) + t.pos);
 
-    pub fn render<F: FnOnce(&Ui) -> Result<()>>(
+            self.transform_mats.push(mat);
+        }
+    }
+
+    pub fn draw<F: FnOnce(&Ui) -> Result<()>>(
         &mut self,
         buffer: &CommandBuffer,
         extent: Extent2D,
@@ -241,35 +259,17 @@ impl GuiInWorld {
         let mut imgui = self.context.take().unwrap().activate().unwrap();
 
         let ui = imgui.new_frame();
-        ui.window("Test")
-            .position([1.0, 0.0], Condition::FirstUseEver)
-            .size([300.0, 300.0], Condition::FirstUseEver)
-            .resizable(false)
-            .movable(false)
-            .build(|| {
-                ui.text("Hello World");
-            });
-
-        ui.window("Test 2")
-            .position([2.0, 0.0], Condition::FirstUseEver)
-            .size([300.0, 300.0], Condition::FirstUseEver)
-            .resizable(false)
-            .movable(false)
-            .build(|| {
-                ui.text("Hello World2");
-            });
+        build(ui)?;
 
         imgui.render();
         imgui.update_platform_windows();
         imgui.render_platform_windows_default();
 
-        for (i, viewport) in imgui.viewports().enumerate() {
-            let transform = Mat4::from_scale(vec3(1.0, -1.0, 1.0) * 0.01)
-                * Mat4::from_rotation_x(f32::to_radians(0.0))
-                * Mat4::from_translation(vec3(-(i as f32), 0.0, 0.0));
+        debug_assert!(imgui.viewports().count() == self.transform_mats.len() + 1, "transform_mats size dosen't match created windows");
 
-            let mat = camera.projection_matrix() * camera.view_matrix() * transform;
-
+        let cam_mat = camera.projection_matrix() * camera.view_matrix();
+        for (i, viewport) in imgui.viewports().enumerate().skip(1) {
+            let mat = cam_mat * self.transform_mats[i - 1];
             let draw_data = viewport.draw_data();
             self.renderer
                 .cmd_draw(buffer.inner, draw_data, extent, Some(&mat.to_cols_array()))?;
@@ -314,4 +314,15 @@ impl RendererViewportBackend for RenderBackend {
     fn set_window_size(&mut self, _: &mut Viewport, _: [f32; 2]) {}
     fn render_window(&mut self, _: &mut Viewport) {}
     fn swap_buffers(&mut self, _: &mut Viewport) {}
+}
+
+impl Default for InWorldGuiTransform {
+    
+    fn default() -> Self { 
+        Self{
+            pos: Vec3::ZERO,
+            rot: Vec3::ZERO,
+            scale: Vec3::ONE,
+        }
+    }
 }
