@@ -128,7 +128,7 @@ impl GraphicsPipeline {
                     color_write_mask: vk::ColorComponentFlags::RGBA,
                     ..Default::default()
                 });
-        
+
         let color_blend_attachments = [color_blend_attachment];
         let color_blending_info = vk::PipelineColorBlendStateCreateInfo::builder()
             .logic_op_enable(false)
@@ -144,7 +144,11 @@ impl GraphicsPipeline {
         let color_attachment_formats = [create_info.color_attachment_format];
         let mut rendering_info = vk::PipelineRenderingCreateInfo::builder()
             .color_attachment_formats(&color_attachment_formats)
-            .depth_attachment_format(create_info.depth_attachment_format.unwrap_or(vk::Format::UNDEFINED));
+            .depth_attachment_format(
+                create_info
+                    .depth_attachment_format
+                    .unwrap_or(vk::Format::UNDEFINED),
+            );
 
         // Depth
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()

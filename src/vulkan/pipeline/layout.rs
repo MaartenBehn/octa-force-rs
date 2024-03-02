@@ -40,7 +40,11 @@ impl Context {
         descriptor_set_layouts: &[&DescriptorSetLayout],
         push_constant_ranges: &[PushConstantRange],
     ) -> Result<PipelineLayout> {
-        PipelineLayout::new(self.device.clone(), descriptor_set_layouts, push_constant_ranges)
+        PipelineLayout::new(
+            self.device.clone(),
+            descriptor_set_layouts,
+            push_constant_ranges,
+        )
     }
 }
 

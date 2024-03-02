@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{vulkan::device::Device, utils::read_shader_from_bytes, Context};
+use crate::{utils::read_shader_from_bytes, vulkan::device::Device, Context};
 
 pub struct ShaderModule {
     device: Arc<Device>,

@@ -1,11 +1,11 @@
-use std::mem::{size_of_val, align_of};
+use std::mem::{align_of, size_of_val};
 
 use anyhow::Result;
 use ash::vk;
 use gpu_allocator::MemoryLocation;
 
-use crate::{Buffer, Context, ImageAndView};
 use crate::vulkan::{CommandBuffer, Image, ImageBarrier};
+use crate::{Buffer, Context, ImageAndView};
 
 pub fn compute_aligned_size(size: u32, alignment: u32) -> u32 {
     (size + (alignment - 1)) & !(alignment - 1)
@@ -16,7 +16,6 @@ pub fn read_shader_from_bytes(bytes: &[u8]) -> Result<Vec<u32>> {
     Ok(ash::util::read_spv(&mut cursor)?)
 }
 
-
 impl Context {
     pub fn create_gpu_only_buffer_from_data<T: Copy>(
         &self,
@@ -25,7 +24,6 @@ impl Context {
     ) -> Result<Buffer> {
         self.create_gpu_only_buffer_from_data_complex(usage, data, align_of::<T>())
     }
-
 
     pub fn create_gpu_only_buffer_from_data_complex<T: Copy>(
         &self,
@@ -95,13 +93,10 @@ impl Context {
         &mut self,
         format: vk::Format,
         extent: vk::Extent2D,
-        storage_images: &mut Vec<ImageAndView>
+        storage_images: &mut Vec<ImageAndView>,
     ) -> Result<()> {
-        let new_storage_images = self.create_storage_images(
-            format,
-            extent,
-            storage_images.len(),
-        )?;
+        let new_storage_images =
+            self.create_storage_images(format, extent, storage_images.len())?;
 
         let _ = std::mem::replace(storage_images, new_storage_images);
 
@@ -109,12 +104,8 @@ impl Context {
     }
 }
 
-
 impl CommandBuffer {
-    pub fn ready_swapchain_image(
-        &self,
-        swapchain_image: &Image,
-    ) -> Result<()> {
+    pub fn ready_swapchain_image(&self, swapchain_image: &Image) -> Result<()> {
         self.pipeline_image_barriers(&[ImageBarrier {
             image: swapchain_image,
             old_layout: vk::ImageLayout::UNDEFINED,
@@ -187,10 +178,7 @@ impl CommandBuffer {
         Ok(())
     }
 
-    pub fn finish_swapchain_image(
-        &self,
-        swapchain_image: &Image,
-    ) -> Result<()> {
+    pub fn finish_swapchain_image(&self, swapchain_image: &Image) -> Result<()> {
         self.pipeline_image_barriers(&[ImageBarrier {
             image: swapchain_image,
             old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
@@ -200,6 +188,7 @@ impl CommandBuffer {
             src_stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
             dst_stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
         }]);
+
+        Ok(())
     }
 }
-

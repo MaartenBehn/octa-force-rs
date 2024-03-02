@@ -14,7 +14,9 @@ use ash::{
     vk,
 };
 
-use crate::{vulkan::device::Device, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice};
+use crate::{
+    vulkan::device::Device, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice,
+};
 
 pub struct RayTracingContext {
     pub pipeline_properties: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,

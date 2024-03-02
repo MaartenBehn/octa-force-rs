@@ -2,11 +2,11 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use ash::vk::{self};
+use gpu_allocator::vulkan::AllocationScheme;
 use gpu_allocator::{
     vulkan::{Allocation, AllocationCreateDesc, Allocator},
     MemoryLocation,
 };
-use gpu_allocator::vulkan::AllocationScheme;
 
 use crate::{vulkan::device::Device, Context};
 
@@ -107,7 +107,7 @@ impl Image {
     pub fn create_image_view(&self, is_depth: bool) -> Result<ImageView> {
         let aspect_mask = if !is_depth {
             vk::ImageAspectFlags::COLOR
-        }else{
+        } else {
             vk::ImageAspectFlags::DEPTH
         };
 

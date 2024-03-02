@@ -1,4 +1,4 @@
-use std::ffi::{c_void, CStr, CString, c_char};
+use std::ffi::{c_char, c_void, CStr, CString};
 
 use anyhow::{ensure, Result};
 use ash::{
@@ -19,7 +19,6 @@ pub struct Instance {
 }
 
 impl Instance {
-
     #[allow(unused_mut)]
     pub(crate) fn new(
         entry: &Entry,

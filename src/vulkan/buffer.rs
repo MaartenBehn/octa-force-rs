@@ -1,14 +1,17 @@
-use std::{sync::{Arc, Mutex}, mem::align_of};
+use std::{
+    mem::align_of,
+    sync::{Arc, Mutex},
+};
 
+use crate::vulkan::align::Align;
+use crate::vulkan::{Context, Device};
 use anyhow::Result;
 use ash::vk;
+use gpu_allocator::vulkan::AllocationScheme;
 use gpu_allocator::{
     vulkan::{Allocation, AllocationCreateDesc, Allocator},
     MemoryLocation,
 };
-use gpu_allocator::vulkan::AllocationScheme;
-use crate::vulkan::align::Align;
-use crate::vulkan::{Context, Device};
 
 pub struct Buffer {
     device: Arc<Device>,
@@ -52,10 +55,7 @@ impl Buffer {
         })
     }
 
-    pub fn copy_data_to_buffer<T: Copy>(
-        &self,
-        data: &[T],
-    ) -> Result<()> {
+    pub fn copy_data_to_buffer<T: Copy>(&self, data: &[T]) -> Result<()> {
         self.copy_data_to_buffer_complex(data, 0, align_of::<T>())
     }
 
@@ -81,10 +81,7 @@ impl Buffer {
         Ok(())
     }
 
-    pub fn get_data_from_buffer<T: Copy>(
-        &self,
-        count: usize,
-    ) -> Result<Vec<T>> {
+    pub fn get_data_from_buffer<T: Copy>(&self, count: usize) -> Result<Vec<T>> {
         self.get_data_from_buffer_complex(count, 0, align_of::<T>())
     }
 

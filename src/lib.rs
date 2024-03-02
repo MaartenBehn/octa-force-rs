@@ -1,20 +1,24 @@
 pub extern crate anyhow;
 pub extern crate glam;
-pub extern crate log;
 pub extern crate imgui;
 pub extern crate imgui_rs_vulkan_renderer;
 pub extern crate imgui_winit_support;
+pub extern crate log;
 
 pub mod camera;
-pub mod logger;
 pub mod controls;
 pub mod gui;
+pub mod logger;
+mod stats;
 pub mod vulkan;
 
+use crate::gui::{Gui, GuiScreen};
+use crate::stats::{FrameStats, StatsDisplayMode};
 use anyhow::Result;
 use ash::vk::{self};
 use controls::Controls;
-use gpu_allocator::MemoryLocation;
+use glam::UVec2;
+use imgui::Ui;
 use logger::log_init;
 use std::{
     marker::PhantomData,
@@ -28,33 +32,34 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
-use crate::gui::{Gui, MainGui};
 
 const IN_FLIGHT_FRAMES: u32 = 2;
 
 pub struct BaseApp<B: App> {
     phantom: PhantomData<B>,
-    raytracing_enabled: bool,
-    compute_rendering_enabled: bool,
+    window: Window,
     pub swapchain: Swapchain,
     pub command_pool: CommandPool,
     command_buffers: Vec<CommandBuffer>,
     in_flight_frames: InFlightFrames,
     pub context: Context,
+
+    pub controls: Controls,
+    frame_stats: FrameStats,
+
+    pub guis: Vec<Gui>,
+    gui_stats: GuiScreen,
+    statsmode: StatsDisplayMode,
 }
 
 pub trait App: Sized {
-    type Gui: Gui;
-
     fn new(base: &mut BaseApp<Self>) -> Result<Self>;
 
     fn update(
         &mut self,
         base: &mut BaseApp<Self>,
-        gui: &mut Self::Gui,
         image_index: usize,
         delta_time: Duration,
-        controls: &Controls,
     ) -> Result<()>;
 
     fn record_render_commands(
@@ -74,42 +79,18 @@ pub trait App: Sized {
     fn on_recreate_swapchain(&mut self, base: &BaseApp<Self>) -> Result<()>;
 }
 
-pub fn run<A: App + 'static>(
-    app_name: &str,
-    width: u32,
-    height: u32,
-    enable_raytracing: bool,
-    enabled_compute_rendering: bool,
-) -> Result<()> {
+pub fn run<A: App + 'static>(app_name: &str, size: UVec2, enable_raytracing: bool) -> Result<()> {
     log_init("app_log.log");
 
-    let (window, event_loop) = create_window(app_name, width, height);
-    
-    let mut base_app = BaseApp::new(
-        &window,
-        app_name,
-        enable_raytracing,
-        enabled_compute_rendering,
-    )?;
-    
-    let mut main_gui= MainGui::new(
-        &base_app.context, 
-        &base_app.command_pool,
-        &window,
-        base_app.swapchain.format,
-        base_app.swapchain.images.len(),
-    )?;
-    
+    let event_loop = EventLoop::new();
+    let mut base_app = BaseApp::new(app_name, size, &event_loop, enable_raytracing)?;
+
     let mut app = A::new(&mut base_app)?;
-    let mut ui = Gui::new()?;
-    
-    let mut controls = Controls::default();
+
     let mut is_swapchain_dirty = false;
 
     let mut last_frame = Instant::now();
     let mut last_frame_start = Instant::now();
-
-    let mut frame_stats = FrameStats::default();
 
     let fps_as_duration = Duration::from_secs_f64(1.0 / 60.0);
 
@@ -117,9 +98,16 @@ pub fn run<A: App + 'static>(
         *control_flow = ControlFlow::Poll;
 
         let app = &mut app; // Make sure it is dropped before base_app
-        
-        main_gui.handle_event(&window, &event);
-        controls = controls.handle_event(&event);
+
+        // Send Event to every Gui
+        base_app.gui_stats.handle_event(&base_app.window, &event);
+        base_app
+            .guis
+            .iter_mut()
+            .for_each(|gui| gui.handle_event(&base_app.window, &event));
+
+        // Send Event to Controls Struct
+        base_app.controls.handle_event(&event);
 
         match event {
             Event::NewEvents(_) => {
@@ -133,10 +121,17 @@ pub fn run<A: App + 'static>(
                 };
                 last_frame_start = Instant::now();
 
-                main_gui.update_delta_time(frame_time);
-                frame_stats.set_frame_time(frame_time, compute_time);
+                base_app.controls.reset();
 
-                controls = controls.reset();
+                base_app
+                    .frame_stats
+                    .set_frame_time(frame_time, compute_time);
+
+                base_app.gui_stats.update_delta_time(frame_time);
+                base_app
+                    .guis
+                    .iter_mut()
+                    .for_each(|gui| gui.update_delta_time(frame_time));
             }
             // On resize
             Event::WindowEvent {
@@ -149,7 +144,7 @@ pub fn run<A: App + 'static>(
             // Draw
             Event::MainEventsCleared => {
                 if is_swapchain_dirty {
-                    let dim = window.inner_size();
+                    let dim = base_app.window.inner_size();
                     if dim.width > 0 && dim.height > 0 {
                         base_app
                             .recreate_swapchain(dim.width, dim.height)
@@ -161,9 +156,7 @@ pub fn run<A: App + 'static>(
                     }
                 }
 
-                is_swapchain_dirty = base_app
-                    .draw(&window, app, &mut main_gui, &mut ui, &mut frame_stats, &controls)
-                    .expect("Failed to tick");
+                is_swapchain_dirty = base_app.draw(app).expect("Failed to tick");
             }
             // Keyboard
             Event::WindowEvent {
@@ -180,7 +173,7 @@ pub fn run<A: App + 'static>(
                 ..
             } => {
                 if key_code == VirtualKeyCode::R && state == ElementState::Pressed {
-                    main_gui.toggle_stats();
+                    base_app.statsmode = base_app.statsmode.next();
                 }
             }
             // Mouse
@@ -190,9 +183,9 @@ pub fn run<A: App + 'static>(
             } => {
                 if button == MouseButton::Right {
                     if state == ElementState::Pressed {
-                        window.set_cursor_visible(false);
+                        base_app.window.set_cursor_visible(false);
                     } else {
-                        window.set_cursor_visible(true);
+                        base_app.window.set_cursor_visible(true);
                     }
                 }
             }
@@ -210,27 +203,21 @@ pub fn run<A: App + 'static>(
     });
 }
 
-fn create_window(app_name: &str, width: u32, height: u32) -> (Window, EventLoop<()>) {
-    log::info!("Creating window and event loop");
-    let events_loop = EventLoop::new();
-    let window = WindowBuilder::new()
-        .with_title(app_name)
-        .with_inner_size(PhysicalSize::new(width, height))
-        .with_resizable(true)
-        .build(&events_loop)
-        .unwrap();
-
-    (window, events_loop)
-}
-
 impl<B: App> BaseApp<B> {
     fn new(
-        window: &Window,
         app_name: &str,
+        size: UVec2,
+        event_loop: &EventLoop<()>,
         enable_raytracing: bool,
-        enabled_compute_rendering: bool,
     ) -> Result<Self> {
-        log::info!("Creating App");
+        log::info!("Creating Engine");
+
+        let window = WindowBuilder::new()
+            .with_title(app_name)
+            .with_inner_size(PhysicalSize::new(size.x, size.y))
+            .with_resizable(true)
+            .build(&event_loop)
+            .unwrap();
 
         // Vulkan context
         let mut required_extensions = vec!["VK_KHR_swapchain"];
@@ -243,7 +230,7 @@ impl<B: App> BaseApp<B> {
         #[cfg(debug_assertions)]
         required_extensions.push("VK_KHR_shader_non_semantic_info");
 
-        let mut context = ContextBuilder::new(window, window)
+        let context = ContextBuilder::new(&window, &window)
             .vulkan_version(VERSION_1_3)
             .app_name(app_name)
             .required_extensions(&required_extensions)
@@ -272,16 +259,31 @@ impl<B: App> BaseApp<B> {
         let command_buffers = create_command_buffers(&command_pool, &swapchain)?;
 
         let in_flight_frames = InFlightFrames::new(&context, IN_FLIGHT_FRAMES)?;
-        
+
+        let frame_stats = FrameStats::default();
+        let controls = Controls::default();
+        let gui_stats = GuiScreen::new(
+            &context,
+            &command_pool,
+            &window,
+            swapchain.format,
+            swapchain.images.len(),
+        )?;
+
         Ok(Self {
             phantom: PhantomData,
-            raytracing_enabled: enable_raytracing,
-            compute_rendering_enabled: enabled_compute_rendering,
+            window,
             context,
             command_pool,
             swapchain,
             command_buffers,
             in_flight_frames,
+            controls,
+            frame_stats,
+
+            guis: Vec::new(),
+            gui_stats,
+            statsmode: StatsDisplayMode::Basic,
         })
     }
 
@@ -300,27 +302,19 @@ impl<B: App> BaseApp<B> {
         self.context.device_wait_idle()
     }
 
-    fn draw(
-        &mut self,
-        window: &Window,
-        base_app: &mut B,
-        main_gui: &mut MainGui,
-        gui: &mut B::Gui,
-        frame_stats: &mut FrameStats,
-        controls: &Controls,
-    ) -> Result<bool> {
+    fn draw(&mut self, base_app: &mut B) -> Result<bool> {
         // Drawing the frame
         self.in_flight_frames.next();
         self.in_flight_frames.fence().wait(None)?;
 
         // Can't get for gpu time on the first frames or vkGetQueryPoolResults gets stuck
         // due to VK_QUERY_RESULT_WAIT_BIT
-        let gpu_time = (frame_stats.total_frame_count >= IN_FLIGHT_FRAMES)
+        let gpu_time = (self.frame_stats.total_frame_count >= IN_FLIGHT_FRAMES)
             .then(|| self.in_flight_frames.gpu_frame_time_ms())
             .transpose()?
             .unwrap_or_default();
-        frame_stats.set_gpu_time_time(gpu_time);
-        frame_stats.tick();
+        self.frame_stats.set_gpu_time_time(gpu_time);
+        self.frame_stats.tick();
 
         let next_image_result = self.swapchain.acquire_next_image(
             std::u64::MAX,
@@ -335,16 +329,9 @@ impl<B: App> BaseApp<B> {
         };
         self.in_flight_frames.fence().reset()?;
 
-        base_app.update(self, gui, image_index, frame_stats.frame_time, controls)?;
-        
-        self.record_command_buffer(
-            image_index,
-            base_app,
-            main_gui,
-            gui,
-            frame_stats,
-            window,
-        )?;
+        base_app.update(self, image_index, self.frame_stats.frame_time)?;
+
+        self.record_command_buffer(image_index, base_app)?;
 
         self.context.graphics_queue.submit(
             &self.command_buffers[image_index],
@@ -376,17 +363,8 @@ impl<B: App> BaseApp<B> {
 
         Ok(false)
     }
-    
-    fn record_command_buffer(
-        &mut self,
-        image_index: usize,
-        base_app: &mut B,
-        main_gui: &mut MainGui,
-        gui: &mut B::Gui,
-        frame_stats: &mut FrameStats,
-        window: &Window,
-    ) -> Result<()> {
-        let swapchain_image_view = &self.swapchain.views[image_index];
+
+    fn record_command_buffer(&mut self, image_index: usize, base_app: &mut B) -> Result<()> {
         let buffer = &self.command_buffers[image_index];
 
         buffer.reset()?;
@@ -400,21 +378,23 @@ impl<B: App> BaseApp<B> {
 
         base_app.record_render_commands(self, buffer, image_index)?;
 
-        // Main UI
-        {
+        if self.statsmode != StatsDisplayMode::None {
             buffer.begin_rendering(
-                swapchain_image_view,
+                &self.swapchain.views[image_index],
                 None,
                 self.swapchain.extent,
                 vk::AttachmentLoadOp::DONT_CARE,
                 None,
             );
-            
-            main_gui.render(buffer, gui, frame_stats, window, self.swapchain.extent)?;
-            
+            self.gui_stats.render(buffer, &self.window, |ui: &Ui| {
+                self.frame_stats
+                    .build_perf_ui(ui, self.statsmode, self.swapchain.extent);
+                Ok(())
+            })?;
             buffer.end_rendering();
         }
 
+        buffer.finish_swapchain_image(&self.swapchain.images[image_index])?;
         buffer.write_timestamp(
             vk::PipelineStageFlags2::ALL_COMMANDS,
             self.in_flight_frames.timing_query_pool(),
@@ -497,81 +477,6 @@ impl InFlightFrames {
         let time = Duration::from_nanos(result[1].saturating_sub(result[0]));
 
         Ok(time)
-    }
-}
-
-#[derive(Debug)]
-struct FrameStats {
-    // we collect gpu timings the frame after it was computed
-    // so we keep frame times for the two last frames
-    previous_frame_time: Duration,
-    frame_time: Duration,
-    previous_compute_time: Duration,
-    compute_time: Duration,
-    gpu_time: Duration,
-    frame_time_ms_log: Queue<f32>,
-    compute_time_ms_log: Queue<f32>,
-    gpu_time_ms_log: Queue<f32>,
-    total_frame_count: u32,
-    frame_count: u32,
-    fps_counter: u32,
-    timer: Duration,
-}
-
-impl Default for FrameStats {
-    fn default() -> Self {
-        Self {
-            previous_frame_time: Default::default(),
-            frame_time: Default::default(),
-            previous_compute_time: Default::default(),
-            compute_time: Default::default(),
-            gpu_time: Default::default(),
-            frame_time_ms_log: Queue::new(FrameStats::MAX_LOG_SIZE),
-            compute_time_ms_log: Queue::new(FrameStats::MAX_LOG_SIZE),
-            gpu_time_ms_log: Queue::new(FrameStats::MAX_LOG_SIZE),
-            total_frame_count: Default::default(),
-            frame_count: Default::default(),
-            fps_counter: Default::default(),
-            timer: Default::default(),
-        }
-    }
-}
-
-impl FrameStats {
-    const ONE_SEC: Duration = Duration::from_secs(1);
-    const MAX_LOG_SIZE: usize = 1000;
-
-    fn tick(&mut self) {
-        // push log
-        self.frame_time_ms_log
-            .push(self.previous_frame_time.as_millis() as _);
-        self.compute_time_ms_log
-            .push(self.previous_compute_time.as_millis() as _);
-        self.gpu_time_ms_log.push(self.gpu_time.as_millis() as _);
-
-        // increment counter
-        self.total_frame_count += 1;
-        self.frame_count += 1;
-        self.timer += self.frame_time;
-
-        // reset counter if a sec has passed
-        if self.timer > FrameStats::ONE_SEC {
-            self.fps_counter = self.frame_count;
-            self.frame_count = 0;
-            self.timer -= FrameStats::ONE_SEC;
-        }
-    }
-
-    fn set_frame_time(&mut self, frame_time: Duration, compute_time: Duration) {
-        self.previous_frame_time = self.frame_time;
-        self.previous_compute_time = self.compute_time;
-
-        self.frame_time = frame_time;
-        self.compute_time = compute_time;
-    }
-
-    fn set_gpu_time_time(&mut self, gpu_time: Duration) {
-        self.gpu_time = gpu_time;
     }
 }
 

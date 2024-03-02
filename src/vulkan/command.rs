@@ -5,8 +5,8 @@ use anyhow::Result;
 use ash::vk::{self, IndexType};
 
 use crate::{
-    vulkan::device::Device, Buffer, ComputePipeline, Context, DescriptorSet, GraphicsPipeline, Image,
-    ImageView, PipelineLayout, QueueFamily, RayTracingContext, RayTracingPipeline,
+    vulkan::device::Device, Buffer, ComputePipeline, Context, DescriptorSet, GraphicsPipeline,
+    Image, ImageView, PipelineLayout, QueueFamily, RayTracingContext, RayTracingPipeline,
     ShaderBindingTable, TimestampQueryPool,
 };
 
@@ -185,19 +185,23 @@ impl CommandBuffer {
         };
     }
 
-    pub fn push_constant<T>(&self, layout: &PipelineLayout, stage_flags: vk::ShaderStageFlags, push_constant: &T) 
-        where T: Sized
+    pub fn push_constant<T>(
+        &self,
+        layout: &PipelineLayout,
+        stage_flags: vk::ShaderStageFlags,
+        push_constant: &T,
+    ) where
+        T: Sized,
     {
         unsafe {
-            let date = slice::from_raw_parts((push_constant as *const T) as *const u8, mem::size_of::<T>());
+            let date = slice::from_raw_parts(
+                (push_constant as *const T) as *const u8,
+                mem::size_of::<T>(),
+            );
 
-            self.device.inner.cmd_push_constants(
-                self.inner,
-                layout.inner,
-                stage_flags,
-                0,
-                date
-            )
+            self.device
+                .inner
+                .cmd_push_constants(self.inner, layout.inner, stage_flags, 0, date)
         };
     }
 
@@ -469,7 +473,7 @@ impl CommandBuffer {
             })
             .layer_count(1)
             .color_attachments(std::slice::from_ref(&color_attachment_info));
-        
+
         let mut depth_attachment_info = vk::RenderingAttachmentInfo::builder();
         if depth_view.is_some() {
             depth_attachment_info = depth_attachment_info
@@ -477,11 +481,11 @@ impl CommandBuffer {
                 .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
                 .load_op(vk::AttachmentLoadOp::CLEAR)
                 .store_op(vk::AttachmentStoreOp::DONT_CARE)
-                .clear_value(vk::ClearValue{
-                    depth_stencil: vk::ClearDepthStencilValue{
-                        depth: f32::MAX, 
+                .clear_value(vk::ClearValue {
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: f32::MAX,
                         stencil: 0,
-                    }
+                    },
                 });
 
             rendering_info = rendering_info.depth_attachment(&depth_attachment_info);

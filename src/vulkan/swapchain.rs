@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::{extensions::khr::Swapchain as AshSwapchain, vk};
 
-use crate::{vulkan::device::Device, Context, Image, ImageView, vulkan::Queue, Semaphore};
+use crate::{vulkan::device::Device, vulkan::Queue, Context, Image, ImageView, Semaphore};
 
 pub struct AcquiredImage {
     pub index: u32,

@@ -1,5 +1,5 @@
-use std::time::Duration;
 use ash::vk::Extent2D;
+use std::time::Duration;
 
 use glam::{vec3, Mat3, Mat4, Quat, Vec3};
 
@@ -42,14 +42,14 @@ impl Camera {
     }
 
     pub fn base(extent: Extent2D) -> Self {
-        Self::new (
+        Self::new(
             vec3(0.0, 0.0, 1.0),
             vec3(0.0, 0.0, -1.0),
             60.0,
             extent.width as f32 / extent.height as f32,
             0.1,
             10.0,
-            vec3(0.0, 1.0, 0.0)
+            vec3(0.0, 1.0, 0.0),
         )
     }
 
@@ -60,7 +60,8 @@ impl Camera {
         // Update direction
         let new_direction = if controls.rigth {
             let side_rot = Quat::from_axis_angle(side, -controls.cursor_delta[1] * ANGLE_PER_POINT);
-            let up_rot =  Quat::from_axis_angle(self.up, -controls.cursor_delta[0] * ANGLE_PER_POINT);
+            let up_rot =
+                Quat::from_axis_angle(self.up, -controls.cursor_delta[0] * ANGLE_PER_POINT);
             let rot = Mat3::from_quat(side_rot * up_rot);
 
             (rot * self.direction).normalize()
@@ -101,11 +102,7 @@ impl Camera {
     }
 
     pub fn view_matrix(&self) -> Mat4 {
-        Mat4::look_at_rh(
-            self.position,
-            self.position + self.direction,
-            self.up,
-        )
+        Mat4::look_at_rh(self.position, self.position + self.direction, self.up)
     }
 
     pub fn projection_matrix(&self) -> Mat4 {
@@ -150,4 +147,3 @@ pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) -> Mat4 {
         c3r0, c3r1, c3r2, c3r3
     ])
 }
-
