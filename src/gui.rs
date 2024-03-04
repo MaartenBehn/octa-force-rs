@@ -4,7 +4,7 @@ use crate::vulkan::{CommandBuffer, CommandPool};
 use anyhow::Result;
 use ash::vk;
 use ash::vk::{Extent2D, Format};
-use glam::{vec3, Mat4, Vec3};
+use glam::{vec3, Mat4, Vec3, Quat, EulerRot};
 use imgui::{
     BackendFlags, ConfigFlags, FontConfig, FontSource, PlatformMonitor,
     PlatformViewportBackend, RendererViewportBackend, SuspendedContext, Ui, Viewport,
@@ -32,13 +32,13 @@ pub struct InWorldGui {
 
 impl<B: App> BaseApp<B> {
     pub fn add_screen_gui(&mut self) -> Result<GuiId> {
-        let gui = ScreenGui::new(&self.context, &self.command_pool, &self.window, self.swapchain.format, IN_FLIGHT_FRAMES as usize)?;
+        let gui = ScreenGui::new(&self.context, &self.command_pool, &self.window, self.swapchain.format, self.swapchain.images.len())?;
         self.screen_guis.push(gui);
         Ok(self.screen_guis.len() -1)
     }
 
     pub fn add_in_world_gui(&mut self) -> Result<GuiId> {
-        let gui = InWorldGui::new(&self.context, &self.command_pool, self.swapchain.format, IN_FLIGHT_FRAMES as usize)?;
+        let gui = InWorldGui::new(&self.context, &self.command_pool, self.swapchain.format, self.swapchain.images.len())?;
         self.in_world_guis.push(gui);
         Ok(self.in_world_guis.len() -1)
     }
@@ -130,11 +130,6 @@ impl ScreenGui {
         self.renderer.cmd_draw(
             buffer.inner,
             draw_data,
-            Extent2D {
-                width: window.inner_size().width,
-                height: window.inner_size().height,
-            },
-            None,
         )?;
 
         self.context = Some(imgui.suspend());
@@ -148,9 +143,9 @@ struct RenderBackend {}
 
 #[derive(Debug, Clone, Copy)]
 pub struct InWorldGuiTransform {
-    pos: Vec3,
-    rot: Vec3,
-    scale: Vec3,
+    pub pos: Vec3,
+    pub rot: Vec3,
+    pub scale: Vec3,
 }
 impl InWorldGui {
     pub fn new(
@@ -217,8 +212,8 @@ impl InWorldGui {
             &mut imgui,
             Some(Options {
                 in_flight_frames,
-                render_3d: true,
-                ..Default::default()
+                enable_depth_test: true,
+                enable_depth_write: true,
             }),
         )?;
 
@@ -234,16 +229,18 @@ impl InWorldGui {
         imgui.io_mut().update_delta_time(frame_time);
         self.context = Some(imgui.suspend());
     }
-    
+
     pub fn set_transfrom(&mut self, transforms: &Vec<InWorldGuiTransform>) {
         self.transform_mats.clear();
         
         for (i, t) in transforms.iter().enumerate() {
-            let mat = Mat4::from_scale(vec3(1.0, -1.0, 1.0) * 0.01 * t.scale) 
-                * Mat4::from_rotation_x(t.rot.x.to_radians())
-                * Mat4::from_rotation_y(t.rot.y.to_radians())
-                * Mat4::from_rotation_z(t.rot.z.to_radians())
-                * Mat4::from_translation(vec3(-(i as f32), 0.0, 0.0) + t.pos);
+            let quat = Quat::from_euler(EulerRot::XYZ, t.rot.x.to_radians(), t.rot.y.to_radians(), t.rot.z.to_radians());
+            let factor = 0.005;
+            let mat = Mat4::from_scale_rotation_translation(
+                vec3(1.0, -1.0, 1.0) * factor * t.scale,
+                quat,
+                vec3(-(i as f32) * factor, 0.0, 0.0) + t.pos
+            );
 
             self.transform_mats.push(mat);
         }
@@ -265,15 +262,23 @@ impl InWorldGui {
         imgui.update_platform_windows();
         imgui.render_platform_windows_default();
 
-        debug_assert!(imgui.viewports().count() == self.transform_mats.len() + 1, "transform_mats size dosen't match created windows");
+
+        debug_assert!(imgui.viewports().count() == self.transform_mats.len() + 1, "transform_mats {} size dosen't match created windows {}", self.transform_mats.len() + 1, imgui.viewports().count());
 
         let cam_mat = camera.projection_matrix() * camera.view_matrix();
+
+        let mut mats = Vec::new();
+        let mut draw_datas = Vec::new();
         for (i, viewport) in imgui.viewports().enumerate().skip(1) {
             let mat = cam_mat * self.transform_mats[i - 1];
             let draw_data = viewport.draw_data();
-            self.renderer
-                .cmd_draw(buffer.inner, draw_data, extent, Some(&mat.to_cols_array()))?;
+
+            mats.push(mat.to_cols_array());
+            draw_datas.push(draw_data);
         }
+
+        self.renderer
+            .cmd_draw_3d(buffer.inner, draw_datas.as_slice(), mats.as_slice(), extent)?;
         self.context = Some(imgui.suspend());
         Ok(())
     }
@@ -317,8 +322,8 @@ impl RendererViewportBackend for RenderBackend {
 }
 
 impl Default for InWorldGuiTransform {
-    
-    fn default() -> Self { 
+
+    fn default() -> Self {
         Self{
             pos: Vec3::ZERO,
             rot: Vec3::ZERO,

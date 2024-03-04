@@ -175,12 +175,16 @@ impl CommandBuffer {
     }
 
     pub fn bind_index_buffer(&self, index_buffer: &Buffer) {
+        self.bind_index_buffer_complex(index_buffer, 0, IndexType::UINT32)
+    }
+
+    pub fn bind_index_buffer_complex(&self, index_buffer: &Buffer, offset: vk::DeviceSize, index_type: IndexType) {
         unsafe {
             self.device.inner.cmd_bind_index_buffer(
                 self.inner,
                 index_buffer.inner,
-                0,
-                IndexType::UINT32,
+                offset,
+                index_type,
             )
         };
     }
