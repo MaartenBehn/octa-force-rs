@@ -548,6 +548,7 @@ dependencies = [
 [[package]]
 name = "imgui-rs-vulkan-renderer"
 version = "1.12.0"
+source = "git+https://github.com/MaartenBehn/imgui-rs-vulkan-renderer#f19fbca3ce2bbf7a48ac3eac060aafa7d9091272"
 dependencies = [
  "ash",
  "gpu-allocator",
