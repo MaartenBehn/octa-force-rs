@@ -52,7 +52,7 @@ pub struct BaseApp<B: App> {
     in_flight_frames: InFlightFrames,
     pub context: Context,
 
-    window: Window,
+    pub window: Window,
 }
 
 pub trait App: Sized {
