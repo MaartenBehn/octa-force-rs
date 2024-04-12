@@ -20,5 +20,5 @@ gpu-allocator = { version = "0.25", default-features = false, features = ["vulka
 
 imgui = { version = "0.11.0", features = ["docking"] }
 imgui-winit-support = "0.11.0"
-# imgui-rs-vulkan-renderer = { git = "https://github.com/MaartenBehn/imgui-rs-vulkan-renderer", version = "1.6.1", features = ["gpu-allocator", "dynamic-rendering"] }
-imgui-rs-vulkan-renderer = { path = "../imgui-rs-vulkan-renderer", version = "1.12.0", features = ["gpu-allocator", "dynamic-rendering"] }
+imgui-rs-vulkan-renderer = { git = "https://github.com/MaartenBehn/imgui-rs-vulkan-renderer", version = "1.6.1", features = ["gpu-allocator", "dynamic-rendering"] }
+# imgui-rs-vulkan-renderer = { path = "../imgui-rs-vulkan-renderer", version = "1.12.0", features = ["gpu-allocator", "dynamic-rendering"] }
