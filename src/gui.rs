@@ -1,14 +1,11 @@
 use crate::camera::Camera;
-use crate::{App, BaseApp, IN_FLIGHT_FRAMES, vulkan};
+use crate::{App, BaseApp, vulkan};
 use crate::vulkan::{CommandBuffer, CommandPool};
 use anyhow::Result;
 use ash::vk;
 use ash::vk::{Extent2D, Format};
 use glam::{vec3, Mat4, Vec3, Quat, EulerRot};
-use imgui::{
-    BackendFlags, ConfigFlags, FontConfig, FontSource, PlatformMonitor,
-    PlatformViewportBackend, RendererViewportBackend, SuspendedContext, Ui, Viewport,
-};
+use imgui::{BackendFlags, ConfigFlags, FontConfig, FontSource, PlatformMonitor, PlatformViewportBackend, RendererViewportBackend, Style, SuspendedContext, Ui, Viewport};
 use imgui_rs_vulkan_renderer::{DynamicRendering, Options, Renderer};
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 use std::ffi::c_void;
@@ -136,6 +133,57 @@ impl ScreenGui {
 
         Ok(())
     }
+
+    pub fn set_style(&mut self, style: Style) {
+        let mut imgui = self.context.take().unwrap().activate().unwrap();
+        copy_style(&mut imgui, style);
+        self.context = Some(imgui.suspend());
+    }
+}
+
+fn copy_style(imgui: &mut imgui::Context, style: Style) {
+    imgui.style_mut().alpha = style.alpha;
+    imgui.style_mut().disabled_alpha = style.disabled_alpha;
+    imgui.style_mut().window_padding = style.window_padding;
+    imgui.style_mut().window_rounding = style.window_rounding;
+    imgui.style_mut().window_border_size = style.window_border_size;
+    imgui.style_mut().window_min_size = style.window_min_size;
+    imgui.style_mut().window_title_align = style.window_title_align;
+    imgui.style_mut().window_menu_button_position = style.window_menu_button_position;
+    imgui.style_mut().child_rounding = style.child_rounding;
+    imgui.style_mut().child_border_size = style.child_border_size;
+    imgui.style_mut().popup_rounding = style.popup_rounding;
+    imgui.style_mut().popup_border_size = style.popup_border_size;
+    imgui.style_mut().frame_padding = style.frame_padding;
+    imgui.style_mut().frame_rounding = style.frame_rounding;
+    imgui.style_mut().frame_border_size = style.frame_border_size;
+    imgui.style_mut().item_spacing = style.item_spacing;
+    imgui.style_mut().item_inner_spacing = style.item_inner_spacing;
+    imgui.style_mut().cell_padding = style.cell_padding;
+    imgui.style_mut().touch_extra_padding = style.touch_extra_padding;
+    imgui.style_mut().indent_spacing = style.indent_spacing;
+    imgui.style_mut().columns_min_spacing = style.columns_min_spacing;
+    imgui.style_mut().scrollbar_size = style.scrollbar_size;
+    imgui.style_mut().scrollbar_rounding = style.scrollbar_rounding;
+    imgui.style_mut().grab_min_size = style.grab_min_size;
+    imgui.style_mut().grab_rounding = style.grab_rounding;
+    imgui.style_mut().log_slider_deadzone = style.log_slider_deadzone;
+    imgui.style_mut().tab_rounding = style.tab_rounding;
+    imgui.style_mut().tab_border_size = style.tab_border_size;
+    imgui.style_mut().tab_min_width_for_close_button = style.tab_min_width_for_close_button;
+    imgui.style_mut().color_button_position = style.color_button_position;
+    imgui.style_mut().button_text_align = style.button_text_align;
+    imgui.style_mut().selectable_text_align = style.selectable_text_align;
+    imgui.style_mut().display_window_padding = style.display_window_padding;
+    imgui.style_mut().display_safe_area_padding = style.display_safe_area_padding;
+    imgui.style_mut().mouse_cursor_scale = style.mouse_cursor_scale;
+    imgui.style_mut().anti_aliased_lines = style.anti_aliased_lines;
+    imgui.style_mut().anti_aliased_lines_use_tex = style.anti_aliased_lines_use_tex;
+    imgui.style_mut().anti_aliased_fill = style.anti_aliased_fill;
+    imgui.style_mut().curve_tessellation_tol = style.curve_tessellation_tol;
+    imgui.style_mut().anti_aliased_fill = style.anti_aliased_fill;
+    imgui.style_mut().circle_tesselation_max_error = style.circle_tesselation_max_error;
+    imgui.style_mut().colors = style.colors;
 }
 
 struct PlatformBackend {}
@@ -281,6 +329,12 @@ impl InWorldGui {
             .cmd_draw_3d(buffer.inner, draw_datas.as_slice(), mats.as_slice(), extent)?;
         self.context = Some(imgui.suspend());
         Ok(())
+    }
+
+    pub fn set_style(&mut self, style: Style) {
+        let mut imgui = self.context.take().unwrap().activate().unwrap();
+        copy_style(&mut imgui, style);
+        self.context = Some(imgui.suspend());
     }
 }
 
