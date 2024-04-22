@@ -12,7 +12,7 @@ pub mod logger;
 mod stats;
 pub mod vulkan;
 
-use crate::gui::{InWorldGui, ScreenGui};
+use crate::gui::{GuiConfig, InWorldGui, ScreenGui};
 use crate::stats::{FrameStats, StatsDisplayMode};
 use anyhow::Result;
 use ash::vk::{self};
@@ -32,6 +32,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+use winit::window::CursorIcon::Default;
 
 const IN_FLIGHT_FRAMES: u32 = 2;
 
@@ -273,6 +274,7 @@ impl<B: App> BaseApp<B> {
             &window,
             swapchain.format,
             swapchain.images.len(),
+            GuiConfig::default()
         )?;
 
         Ok(Self {

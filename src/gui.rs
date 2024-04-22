@@ -4,7 +4,7 @@ use crate::vulkan::{CommandBuffer, CommandPool};
 use anyhow::Result;
 use ash::vk;
 use ash::vk::{Extent2D, Format};
-use glam::{vec3, Mat4, Vec3, Quat, EulerRot};
+use glam::{vec3, Mat4, Vec3, Quat, EulerRot, Vec2};
 use imgui::{BackendFlags, ConfigFlags, FontConfig, FontId, FontSource, PlatformMonitor, PlatformViewportBackend, RendererViewportBackend, Style, SuspendedContext, Ui, Viewport};
 use imgui_rs_vulkan_renderer::{DynamicRendering, Options, Renderer};
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
@@ -13,6 +13,11 @@ use std::time::Duration;
 use winit::{event::Event, window::Window};
 
 pub type GuiId = usize;
+
+pub struct GuiConfig<'a> {
+    pub font_sources: Vec<FontSource<'a>>,
+    pub images: Vec<String>,
+}
 
 pub struct ScreenGui {
     context: Option<SuspendedContext>,
@@ -27,15 +32,17 @@ pub struct InWorldGui {
 }
 
 
+
+
 impl<B: App> BaseApp<B> {
-    pub fn add_screen_gui(&mut self) -> Result<GuiId> {
-        let gui = ScreenGui::new(&self.context, &self.command_pool, &self.window, self.swapchain.format, self.swapchain.images.len())?;
+    pub fn add_screen_gui(&mut self, config: GuiConfig) -> Result<GuiId> {
+        let gui = ScreenGui::new(&self.context, &self.command_pool, &self.window, self.swapchain.format, self.swapchain.images.len(), config)?;
         self.screen_guis.push(gui);
         Ok(self.screen_guis.len() -1)
     }
 
-    pub fn add_in_world_gui(&mut self) -> Result<GuiId> {
-        let gui = InWorldGui::new(&self.context, &self.command_pool, self.swapchain.format, self.swapchain.images.len())?;
+    pub fn add_in_world_gui(&mut self, config: GuiConfig) -> Result<GuiId> {
+        let gui = InWorldGui::new(&self.context, &self.command_pool, self.swapchain.format, self.swapchain.images.len(), config)?;
         self.in_world_guis.push(gui);
         Ok(self.in_world_guis.len() -1)
     }
@@ -48,6 +55,7 @@ impl ScreenGui {
         window: &Window,
         format: Format,
         in_flight_frames: usize,
+        gui_config: GuiConfig
     ) -> Result<ScreenGui> {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
@@ -56,22 +64,22 @@ impl ScreenGui {
 
         let hidpi_factor = platform.hidpi_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
-        imgui.fonts().add_font(&[
-            FontSource::DefaultFontData {
-                config: Some(FontConfig {
+
+        if gui_config.font_sources.is_empty() {
+            imgui.fonts().add_font(&[
+                FontSource::TtfData {
+                    data: include_bytes!("../assets/fonts/mplus-1p-regular.ttf"),
                     size_pixels: font_size,
-                    ..FontConfig::default()
-                }),
-            },
-            FontSource::TtfData {
-                data: include_bytes!("../assets/fonts/mplus-1p-regular.ttf"),
-                size_pixels: font_size,
-                config: Some(FontConfig {
-                    rasterizer_multiply: 1.75,
-                    ..FontConfig::default()
-                }),
-            },
-        ]);
+                    config: Some(FontConfig {
+                        rasterizer_multiply: 1.75,
+                        ..FontConfig::default()
+                    }),
+                },
+            ]);
+        } else {
+            imgui.fonts().add_font(&gui_config.font_sources);
+        }
+
         imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
         platform.attach_window(imgui.io_mut(), window, HiDpiMode::Rounded);
 
@@ -140,12 +148,8 @@ impl ScreenGui {
         self.context = Some(imgui.suspend());
     }
 
-    pub fn add_font(&mut self, font_sources: &[FontSource<'_>]) -> FontId {
-        let mut imgui = self.context.take().unwrap().activate().unwrap();
-        let id = imgui.fonts().add_font(font_sources);
-        self.context = Some(imgui.suspend());
-
-        return id
+    pub fn get_platform_scale(&self) -> f32 {
+        return self.platform.hidpi_factor() as f32
     }
 }
 
@@ -166,27 +170,25 @@ impl InWorldGui {
         command_pool: &CommandPool,
         format: Format,
         in_flight_frames: usize,
+        gui_config: GuiConfig
     ) -> Result<InWorldGui> {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
 
-        let font_size = 13.0;
-        imgui.fonts().add_font(&[
-            FontSource::DefaultFontData {
-                config: Some(FontConfig {
-                    size_pixels: font_size,
-                    ..FontConfig::default()
-                }),
-            },
-            FontSource::TtfData {
-                data: include_bytes!("../assets/fonts/mplus-1p-regular.ttf"),
-                size_pixels: font_size,
-                config: Some(FontConfig {
-                    rasterizer_multiply: 1.75,
-                    ..FontConfig::default()
-                }),
-            },
-        ]);
+        if gui_config.font_sources.is_empty() {
+            imgui.fonts().add_font(&[
+                FontSource::TtfData {
+                    data: include_bytes!("../assets/fonts/mplus-1p-regular.ttf"),
+                    size_pixels: 13.0,
+                    config: Some(FontConfig {
+                        rasterizer_multiply: 1.75,
+                        ..FontConfig::default()
+                    }),
+                },
+            ]);
+        } else {
+            imgui.fonts().add_font(&gui_config.font_sources);
+        }
         imgui.io_mut().font_global_scale = 1.0;
         //imgui.io_mut().display_size = [display_size.x as f32, display_size.y as f32];
         imgui.io_mut().display_size = [1.0, 1.0];
@@ -262,7 +264,7 @@ impl InWorldGui {
     pub fn draw<F: FnOnce(&Ui) -> Result<()>>(
         &mut self,
         buffer: &CommandBuffer,
-        extent: Extent2D,
+        view_port_size: Vec2,
         camera: &Camera,
         build: F,
     ) -> Result<()> {
@@ -291,7 +293,7 @@ impl InWorldGui {
         }
 
         self.renderer
-            .cmd_draw_3d(buffer.inner, draw_datas.as_slice(), mats.as_slice(), extent)?;
+            .cmd_draw_3d(buffer.inner, draw_datas.as_slice(), mats.as_slice(), view_port_size.as_ref())?;
         self.context = Some(imgui.suspend());
         Ok(())
     }
@@ -300,14 +302,6 @@ impl InWorldGui {
         let mut imgui = self.context.take().unwrap().activate().unwrap();
         set(imgui.style_mut());
         self.context = Some(imgui.suspend());
-    }
-
-    pub fn add_font(&mut self, font_sources: &[FontSource<'_>]) -> FontId {
-        let mut imgui = self.context.take().unwrap().activate().unwrap();
-        let id = imgui.fonts().add_font(font_sources);
-        self.context = Some(imgui.suspend());
-
-        return id
     }
 }
 
@@ -355,6 +349,15 @@ impl Default for InWorldGuiTransform {
             pos: Vec3::ZERO,
             rot: Vec3::ZERO,
             scale: Vec3::ONE,
+        }
+    }
+}
+
+impl Default for GuiConfig<'_> {
+    fn default() -> Self {
+        GuiConfig {
+            font_sources: Vec::new(),
+            images: Vec::new(),
         }
     }
 }
