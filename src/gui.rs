@@ -140,9 +140,9 @@ impl ScreenGui {
         self.context = Some(imgui.suspend());
     }
 
-    pub fn add_font(&mut self, font_sources: FontSource<'_>) -> FontId {
+    pub fn add_font(&mut self, font_sources: &[FontSource<'_>]) -> FontId {
         let mut imgui = self.context.take().unwrap().activate().unwrap();
-        let id = imgui.fonts().add_font(&[font_sources]);
+        let id = imgui.fonts().add_font(font_sources);
         self.context = Some(imgui.suspend());
 
         return id
@@ -302,9 +302,9 @@ impl InWorldGui {
         self.context = Some(imgui.suspend());
     }
 
-    pub fn add_font(&mut self, font_sources: FontSource<'_>) -> FontId {
+    pub fn add_font(&mut self, font_sources: &[FontSource<'_>]) -> FontId {
         let mut imgui = self.context.take().unwrap().activate().unwrap();
-        let id = imgui.fonts().add_font(&[font_sources]);
+        let id = imgui.fonts().add_font(font_sources);
         self.context = Some(imgui.suspend());
 
         return id
