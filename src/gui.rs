@@ -5,7 +5,7 @@ use anyhow::Result;
 use ash::vk;
 use ash::vk::{Extent2D, Format};
 use glam::{vec3, Mat4, Vec3, Quat, EulerRot};
-use imgui::{BackendFlags, ConfigFlags, FontAtlas, FontConfig, FontSource, PlatformMonitor, PlatformViewportBackend, RendererViewportBackend, Style, SuspendedContext, Ui, Viewport};
+use imgui::{BackendFlags, ConfigFlags, FontConfig, FontId, FontSource, PlatformMonitor, PlatformViewportBackend, RendererViewportBackend, Style, SuspendedContext, Ui, Viewport};
 use imgui_rs_vulkan_renderer::{DynamicRendering, Options, Renderer};
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 use std::ffi::c_void;
@@ -140,12 +140,12 @@ impl ScreenGui {
         self.context = Some(imgui.suspend());
     }
 
-    pub fn add_font(&mut self, font_sources: &[FontSource<'_>]) -> usize {
+    pub fn add_font(&mut self, font_sources: FontSource<'_>) -> FontId {
         let mut imgui = self.context.take().unwrap().activate().unwrap();
-        let index = imgui.fonts().add_font(font_sources);
+        let id = imgui.fonts().add_font(&[font_sources]);
         self.context = Some(imgui.suspend());
 
-        return index.into()
+        return id
     }
 }
 
@@ -302,12 +302,12 @@ impl InWorldGui {
         self.context = Some(imgui.suspend());
     }
 
-    pub fn add_font(&mut self, font_sources: &[FontSource<'_>]) -> usize {
+    pub fn add_font(&mut self, font_sources: FontSource<'_>) -> FontId {
         let mut imgui = self.context.take().unwrap().activate().unwrap();
-        let index = imgui.fonts().add_font(font_sources);
+        let id = imgui.fonts().add_font(&[font_sources]);
         self.context = Some(imgui.suspend());
 
-        return index.into()
+        return id
     }
 }
 
