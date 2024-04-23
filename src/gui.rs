@@ -16,7 +16,6 @@ pub type GuiId = usize;
 
 pub struct GuiConfig<'a> {
     pub font_sources: Vec<FontSource<'a>>,
-    pub images: Vec<String>,
 }
 
 pub struct ScreenGui {
@@ -357,7 +356,6 @@ impl Default for GuiConfig<'_> {
     fn default() -> Self {
         GuiConfig {
             font_sources: Vec::new(),
-            images: Vec::new(),
         }
     }
 }
