@@ -28,50 +28,6 @@ impl Swapchain {
 
         let device = context.device.clone();
 
-        // Swapchain format
-        let format = {
-            let formats = unsafe {
-                context.surface.inner.get_physical_device_surface_formats(
-                    context.physical_device.inner,
-                    context.surface.surface_khr,
-                )?
-            };
-            if formats.len() == 1 && formats[0].format == vk::Format::UNDEFINED {
-                vk::SurfaceFormatKHR {
-                    format: vk::Format::B8G8R8A8_UNORM,
-                    color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
-                }
-            } else {
-                *formats
-                    .iter()
-                    .find(|format| {
-                        format.format == vk::Format::B8G8R8A8_UNORM
-                            && format.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
-                    })
-                    .unwrap_or(&formats[0])
-            }
-        };
-        log::debug!("Swapchain format: {format:?}");
-
-        // Swapchain present mode
-        let present_mode = {
-            let present_modes = unsafe {
-                context
-                    .surface
-                    .inner
-                    .get_physical_device_surface_present_modes(
-                        context.physical_device.inner,
-                        context.surface.surface_khr,
-                    )?
-            };
-            if present_modes.contains(&vk::PresentModeKHR::IMMEDIATE) {
-                vk::PresentModeKHR::IMMEDIATE
-            } else {
-                vk::PresentModeKHR::FIFO
-            }
-        };
-        log::debug!("Swapchain present mode: {present_mode:?}");
-
         let capabilities = unsafe {
             context
                 .surface
@@ -106,6 +62,9 @@ impl Swapchain {
             context.present_queue_family.index,
         ];
 
+        let format = context.physical_device.surface_format.unwrap();
+        let present_mode = context.physical_device.present_mode.unwrap();
+
         let create_info = {
             let mut builder = vk::SwapchainCreateInfoKHR::builder()
                 .surface(context.surface.surface_khr)
@@ -129,7 +88,7 @@ impl Swapchain {
             builder
                 .pre_transform(capabilities.current_transform)
                 .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-                .present_mode(present_mode)
+                .present_mode(context.physical_device.present_mode.unwrap())
                 .clipped(true)
         };
 

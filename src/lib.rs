@@ -32,7 +32,6 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
-use winit::window::CursorIcon::Default;
 
 const IN_FLIGHT_FRAMES: u32 = 2;
 
@@ -226,29 +225,30 @@ impl<B: App> BaseApp<B> {
             .unwrap();
 
         // Vulkan context
-        let mut required_extensions = vec!["VK_KHR_swapchain"];
+        let mut required_extensions = vec![];
         if enable_raytracing {
-            required_extensions.push("VK_KHR_ray_tracing_pipeline");
-            required_extensions.push("VK_KHR_acceleration_structure");
-            required_extensions.push("VK_KHR_deferred_host_operations");
+            required_extensions.append(&mut vec![
+                "VK_KHR_ray_tracing_pipeline",
+                "VK_KHR_acceleration_structure",
+                "VK_KHR_deferred_host_operations"
+            ]);
         }
 
-        #[cfg(debug_assertions)]
-        required_extensions.push("VK_KHR_shader_non_semantic_info");
+        let mut required_device_features = vec![];
+        if enable_raytracing {
+            required_device_features.append(&mut vec![
+                "rayTracingPipeline",
+                "accelerationStructure",
+                "runtimeDescriptorArray",
+                "bufferDeviceAddress"
+            ]);
+        }
 
         let context = ContextBuilder::new(&window, &window)
             .vulkan_version(VERSION_1_3)
             .app_name(app_name)
-            .required_extensions(&required_extensions)
-            .required_device_features(DeviceFeatures {
-                ray_tracing_pipeline: enable_raytracing,
-                acceleration_structure: enable_raytracing,
-                runtime_descriptor_array: enable_raytracing,
-                buffer_device_address: enable_raytracing,
-                dynamic_rendering: true,
-                synchronization2: true,
-            })
-            .with_raytracing_context(enable_raytracing)
+            .required_extensions(required_extensions)
+            .required_device_features(required_device_features)
             .build()?;
 
         let command_pool = context.create_command_pool(

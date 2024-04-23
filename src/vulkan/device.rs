@@ -8,6 +8,7 @@ use crate::{
     vulkan::physical_device::PhysicalDevice,
     vulkan::queue::{Queue, QueueFamily},
 };
+use crate::vulkan::physical_device::PhysicalDeviceFeatures;
 
 pub struct Device {
     pub inner: AshDevice,
@@ -18,8 +19,8 @@ impl Device {
         instance: &Instance,
         physical_device: &PhysicalDevice,
         queue_families: &[QueueFamily],
-        required_extensions: &[&str],
-        device_features: &DeviceFeatures,
+        extensions: &Vec<String>,
+        device_features: &Vec<String>,
     ) -> Result<Self> {
         let queue_priorities = [1.0f32];
 
@@ -38,38 +39,22 @@ impl Device {
                 .collect::<Vec<_>>()
         };
 
-        let device_extensions_ptrs = required_extensions
+        let device_extensions = extensions
             .iter()
-            .map(|e| CString::new(*e))
+            .map(|e| CString::new(e.to_owned()))
             .collect::<Result<Vec<_>, _>>()?;
-        let device_extensions_ptrs = device_extensions_ptrs
+        let device_extensions_ptrs = device_extensions
             .iter()
             .map(|e| e.as_ptr())
             .collect::<Vec<_>>();
 
-        let mut ray_tracing_feature = vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
-            .ray_tracing_pipeline(device_features.ray_tracing_pipeline);
-        let mut acceleration_struct_feature =
-            vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
-                .acceleration_structure(device_features.acceleration_structure);
-        let mut vulkan_12_features = vk::PhysicalDeviceVulkan12Features::builder()
-            .runtime_descriptor_array(device_features.runtime_descriptor_array)
-            .buffer_device_address(device_features.buffer_device_address);
-        let mut vulkan_13_features = vk::PhysicalDeviceVulkan13Features::builder()
-            .dynamic_rendering(device_features.dynamic_rendering)
-            .synchronization2(device_features.synchronization2);
-
-        let mut features = vk::PhysicalDeviceFeatures2::builder()
-            .features(vk::PhysicalDeviceFeatures::default())
-            .push_next(&mut acceleration_struct_feature)
-            .push_next(&mut ray_tracing_feature)
-            .push_next(&mut vulkan_12_features)
-            .push_next(&mut vulkan_13_features);
+        let mut features = PhysicalDeviceFeatures::new(device_features);
+        let mut vulkan_features = features.vulkan_features();
 
         let device_create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&queue_create_infos)
             .enabled_extension_names(&device_extensions_ptrs)
-            .push_next(&mut features);
+            .push_next(&mut vulkan_features);
 
         let inner = unsafe {
             instance
@@ -94,23 +79,4 @@ impl Drop for Device {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DeviceFeatures {
-    pub ray_tracing_pipeline: bool,
-    pub acceleration_structure: bool,
-    pub runtime_descriptor_array: bool,
-    pub buffer_device_address: bool,
-    pub dynamic_rendering: bool,
-    pub synchronization2: bool,
-}
 
-impl DeviceFeatures {
-    pub fn is_compatible_with(&self, requirements: &Self) -> bool {
-        (!requirements.ray_tracing_pipeline || self.ray_tracing_pipeline)
-            && (!requirements.acceleration_structure || self.acceleration_structure)
-            && (!requirements.runtime_descriptor_array || self.runtime_descriptor_array)
-            && (!requirements.buffer_device_address || self.buffer_device_address)
-            && (!requirements.dynamic_rendering || self.dynamic_rendering)
-            && (!requirements.synchronization2 || self.synchronization2)
-    }
-}

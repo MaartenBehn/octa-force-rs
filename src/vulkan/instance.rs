@@ -6,6 +6,7 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
+use ash::vk::SurfaceFormatKHR;
 use raw_window_handle::HasRawDisplayHandle;
 
 use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, Version};
@@ -16,6 +17,8 @@ pub struct Instance {
     pub(crate) inner: AshInstance,
     debug_report_callback: Option<(DebugUtils, DebugUtilsMessengerEXT)>,
     physical_devices: Vec<PhysicalDevice>,
+    pub(crate) validation_layers: bool,
+    pub(crate) debug_printing: bool,
 }
 
 impl Instance {
@@ -37,62 +40,68 @@ impl Instance {
             ash_window::enumerate_required_extensions(display_handle.raw_display_handle())?
                 .to_vec();
 
-        // Validation
-        #[cfg(debug_assertions)]
-        extension_names.push(DebugUtils::name().as_ptr());
-
         let mut instance_create_info = vk::InstanceCreateInfo::builder()
-            .application_info(&app_info)
-            .enabled_extension_names(&extension_names);
+            .application_info(&app_info);
 
-        // Validation
+        // Validation Layers
+        let mut validation_layers = false;
         #[cfg(debug_assertions)]
         let (_layer_names, layer_names_ptrs) = get_validation_layer_names_and_pointers();
         #[cfg(debug_assertions)]
-        {
-            check_validation_layer_support(&entry)?;
+        if check_validation_layer_support(&entry) {
+            extension_names.push(DebugUtils::name().as_ptr());
             instance_create_info = instance_create_info.enabled_layer_names(&layer_names_ptrs);
+            validation_layers = true;
         }
 
         // Debug Printing
+        let mut debug_printing = false;
         #[cfg(debug_assertions)]
-        let mut validation_features = vk::ValidationFeaturesEXT::builder()
-            .enabled_validation_features(&[vk::ValidationFeatureEnableEXT::DEBUG_PRINTF]);
+        let mut validation_features = vk::ValidationFeaturesEXT::builder();
         #[cfg(debug_assertions)]
-        {
+        if validation_layers {
+            validation_features = validation_features.enabled_validation_features(&[vk::ValidationFeatureEnableEXT::DEBUG_PRINTF]);
             instance_create_info = instance_create_info.push_next(&mut validation_features);
+            debug_printing = true;
         }
+
+        instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
 
         // Creating Instance
         let inner = unsafe { entry.create_instance(&instance_create_info, None)? };
 
         // Validation
-        let debug_report_callback = setup_debug_messenger(&entry, &inner);
+        let debug_report_callback = if validation_layers {
+            Some(setup_debug_messenger(&entry, &inner))
+        } else {
+            None
+        };
 
         Ok(Self {
             inner,
             debug_report_callback,
             physical_devices: vec![],
+            validation_layers,
+            debug_printing
         })
     }
 
     pub(crate) fn enumerate_physical_devices(
         &mut self,
         surface: &Surface,
+        required_extensions: &Vec<String>,
+        wanted_extensions: &Vec<String>,
+        wanted_surface_formats: &Vec<SurfaceFormatKHR>,
+        required_device_features: &Vec<String>,
+        wanted_device_features: &Vec<String>,
     ) -> Result<&[PhysicalDevice]> {
         if self.physical_devices.is_empty() {
             let physical_devices = unsafe { self.inner.enumerate_physical_devices()? };
 
-            let mut physical_devices = physical_devices
+            let physical_devices = physical_devices
                 .into_iter()
-                .map(|pd| PhysicalDevice::new(&self.inner, surface, pd))
+                .map(|pd| PhysicalDevice::new(&self.inner, surface, pd, required_extensions, wanted_extensions, wanted_surface_formats, required_device_features, wanted_device_features))
                 .collect::<Result<Vec<_>>>()?;
-
-            physical_devices.sort_by_key(|pd| match pd.device_type {
-                vk::PhysicalDeviceType::DISCRETE_GPU => 0,
-                vk::PhysicalDeviceType::INTEGRATED_GPU => 1,
-                _ => 2,
-            });
 
             self.physical_devices = physical_devices;
         }
@@ -118,14 +127,12 @@ pub fn get_validation_layer_names_and_pointers() -> (Vec<CString>, Vec<*const c_
 
 /// Check if the required validation set in `REQUIRED_LAYERS`
 /// are supported by the Vulkan instance.
-///
-/// # Panics
-///
-/// Panic if at least one on the layer is not supported.
 #[allow(dead_code)]
-pub fn check_validation_layer_support(entry: &Entry) -> Result<()> {
+pub fn check_validation_layer_support(entry: &Entry) -> bool {
+
+    let mut found = false;
     for required in REQUIRED_DEBUG_LAYERS.iter() {
-        let found = entry
+        found |= entry
             .enumerate_instance_layer_properties()
             .unwrap()
             .iter()
@@ -134,11 +141,13 @@ pub fn check_validation_layer_support(entry: &Entry) -> Result<()> {
                 let name = name.to_str().expect("Failed to get layer name pointer");
                 required == &name
             });
-
-        ensure!(found, "Validation layer not supported: {}", required);
     }
 
-    Ok(())
+    if !found {
+        log::warn!("Validation layer not supported: {:?}", REQUIRED_DEBUG_LAYERS);
+    }
+
+    found
 }
 
 #[allow(dead_code)]
@@ -153,7 +162,9 @@ unsafe extern "system" fn vulkan_debug_callback(
     let message = CStr::from_ptr((*p_callback_data).p_message);
     match flag {
         Flag::VERBOSE => log::trace!("{:?} - {:?}", typ, message),
-        Flag::INFO => log::info!("{:?} - {:?}", typ, message),
+        Flag::INFO => {
+            //log::info!("{:?} - {:?}", typ, message)
+        },
         Flag::WARNING => log::warn!("{:?} - {:?}", typ, message),
         _ => log::error!("{:?} - {:?}", typ, message),
     }
@@ -161,38 +172,33 @@ unsafe extern "system" fn vulkan_debug_callback(
 }
 
 /// Setup the debug message if validation layers are enabled.
+#[allow(dead_code)]
 pub fn setup_debug_messenger(
     _entry: &Entry,
     _instance: &AshInstance,
-) -> Option<(DebugUtils, vk::DebugUtilsMessengerEXT)> {
-    #[cfg(not(debug_assertions))]
-    return None;
+) -> (DebugUtils, vk::DebugUtilsMessengerEXT) {
+    let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+        .message_severity(
+            vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
+                | vk::DebugUtilsMessageSeverityFlagsEXT::INFO
+                | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+                | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+        )
+        .message_type(
+            vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
+                | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
+        )
+        .pfn_user_callback(Some(vulkan_debug_callback));
 
-    #[cfg(debug_assertions)]
-    {
-        let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
-            .message_severity(
-                vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
-                    | vk::DebugUtilsMessageSeverityFlagsEXT::INFO
-                    | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-                    | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-            )
-            .message_type(
-                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
-                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
-                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
-            )
-            .pfn_user_callback(Some(vulkan_debug_callback));
+    let debug_utils = DebugUtils::new(_entry, _instance);
+    let debug_utils_messenger = unsafe {
+        debug_utils
+            .create_debug_utils_messenger(&create_info, None)
+            .unwrap()
+    };
 
-        let debug_utils = DebugUtils::new(_entry, _instance);
-        let debug_utils_messenger = unsafe {
-            debug_utils
-                .create_debug_utils_messenger(&create_info, None)
-                .unwrap()
-        };
-
-        Some((debug_utils, debug_utils_messenger))
-    }
+    (debug_utils, debug_utils_messenger)
 }
 
 impl Drop for Instance {
