@@ -1,7 +1,3 @@
-pub extern crate egui;
-pub extern crate egui_ash_renderer;
-pub extern crate egui_winit;
-
 use anyhow::Result;
 use egui::{
     Context as EguiContext, FullOutput, TextureId,

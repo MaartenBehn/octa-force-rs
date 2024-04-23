@@ -1,6 +1,10 @@
 pub extern crate anyhow;
 pub extern crate glam;
 pub extern crate log;
+pub extern crate egui;
+pub extern crate egui_ash_renderer;
+pub extern crate egui_winit;
+pub extern crate egui_extras;
 
 pub mod camera;
 pub mod controls;

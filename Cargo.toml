@@ -22,3 +22,6 @@ egui = "0.26"
 egui_plot = "0.26"
 egui-winit = "0.26"
 egui-ash-renderer = { version = "0.1.0", features = ["gpu-allocator", "dynamic-rendering"]}
+
+egui_extras = { version = "0.26", default-features = false, features = ["all_loaders"] }
+image = { version = "0.24", features = ["jpeg", "png"] }
