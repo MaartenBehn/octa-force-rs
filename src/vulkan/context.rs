@@ -58,9 +58,10 @@ impl<'a> ContextBuilder<'a> {
         let required_extensions = vec![
             "VK_KHR_swapchain".to_owned(),
             "VK_KHR_dynamic_rendering".to_owned()];
-
+        
+        let mut wanted_extensions = vec![];
         #[cfg(debug_assertions)]
-        let wanted_extensions = vec!["VK_KHR_shader_non_semantic_info".to_owned()];
+        wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
 
         let required_device_features = vec![
             "dynamicRendering".to_owned(),

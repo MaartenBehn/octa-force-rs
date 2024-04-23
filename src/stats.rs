@@ -1,7 +1,6 @@
-use crate::Queue;
-use ash::vk::Extent2D;
-use imgui::{Condition, Ui};
+use crate::{gui, Queue};
 use std::time::Duration;
+use egui::Align2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StatsDisplayMode {
@@ -32,10 +31,11 @@ pub(crate) struct FrameStats {
     frame_time_ms_log: Queue<f32>,
     compute_time_ms_log: Queue<f32>,
     gpu_time_ms_log: Queue<f32>,
-    pub(crate) total_frame_count: u32,
-    frame_count: u32,
-    fps_counter: u32,
+    pub(crate) total_frame_count: usize,
+    frame_count: usize,
+    fps_counter: usize,
     timer: Duration,
+    pub(crate) stats_display_mode: StatsDisplayMode,
 }
 
 impl Default for FrameStats {
@@ -53,6 +53,7 @@ impl Default for FrameStats {
             frame_count: Default::default(),
             fps_counter: Default::default(),
             timer: Default::default(),
+            stats_display_mode: StatsDisplayMode::Basic,
         }
     }
 }
@@ -60,6 +61,10 @@ impl Default for FrameStats {
 impl FrameStats {
     const ONE_SEC: Duration = Duration::from_secs(1);
     const MAX_LOG_SIZE: usize = 1000;
+
+    pub(crate) fn toggle_stats(&mut self) {
+        self.stats_display_mode = self.stats_display_mode.next();
+    }
 
     pub(crate) fn tick(&mut self) {
         // push log
@@ -94,55 +99,56 @@ impl FrameStats {
         self.gpu_time = gpu_time;
     }
 
-    pub(crate) fn build_perf_ui(&mut self, ui: &Ui, mode: StatsDisplayMode, extent: Extent2D) {
-        let width = extent.width as f32;
-        let height = extent.height as f32;
-
-        if matches!(mode, StatsDisplayMode::Basic | StatsDisplayMode::Full) {
-            ui.window("Frame stats")
-                .focus_on_appearing(false)
-                .no_decoration()
-                .bg_alpha(0.5)
-                .position([5.0, 5.0], Condition::Always)
-                .size([160.0, 140.0], Condition::FirstUseEver)
-                .build(|| {
-                    ui.text("Framerate");
-                    ui.label_text("fps", self.fps_counter.to_string());
-                    ui.text("Frametimes");
-                    ui.label_text("Frame", format!("{:?}", self.frame_time));
-                    ui.label_text("CPU", format!("{:?}", self.compute_time));
-                    ui.label_text("GPU", format!("{:?}", self.gpu_time));
+    pub(crate) fn build_perf_ui(&mut self, ctx: &gui::egui::Context) {
+        if matches!(
+            self.stats_display_mode,
+            StatsDisplayMode::Basic | StatsDisplayMode::Full
+        ) {
+            egui::Window::new("Frame stats")
+                .anchor(Align2::RIGHT_TOP, [-5.0, 5.0])
+                .collapsible(false)
+                .interactable(false)
+                .resizable(false)
+                .drag_to_scroll(false)
+                .show(ctx, |ui| {
+                    ui.label("Framerate");
+                    ui.label(format!("{} fps", self.fps_counter));
+                    ui.label("Frametimes");
+                    ui.label(format!("all - {:?}", self.frame_time));
+                    ui.label(format!("cpu - {:?}", self.compute_time));
+                    ui.label(format!("gpu - {:?}", self.gpu_time));
                 });
         }
 
-        if matches!(mode, StatsDisplayMode::Full) {
-            let graph_size = [width - 80.0, 40.0];
-            const SCALE_MIN: f32 = 0.0;
-            const SCALE_MAX: f32 = 17.0;
-
-            ui.window("Frametime graphs")
-                .focus_on_appearing(false)
-                .no_decoration()
-                .bg_alpha(0.5)
-                .position([5.0, height - 145.0], Condition::Always)
-                .size([width - 10.0, 140.0], Condition::Always)
-                .build(|| {
-                    ui.plot_lines("Frame", &self.frame_time_ms_log.0)
-                        .scale_min(SCALE_MIN)
-                        .scale_max(SCALE_MAX)
-                        .graph_size(graph_size)
-                        .build();
-                    ui.plot_lines("CPU", &self.compute_time_ms_log.0)
-                        .scale_min(SCALE_MIN)
-                        .scale_max(SCALE_MAX)
-                        .graph_size(graph_size)
-                        .build();
-                    ui.plot_lines("GPU", &self.gpu_time_ms_log.0)
-                        .scale_min(SCALE_MIN)
-                        .scale_max(SCALE_MAX)
-                        .graph_size(graph_size)
-                        .build();
-                });
+        if matches!(self.stats_display_mode, StatsDisplayMode::Full) {
+            egui::TopBottomPanel::bottom("frametime_graphs").show(ctx, |ui| {
+                build_frametime_plot(ui, "Frames", &self.frame_time_ms_log.0);
+                ui.add_space(5.0);
+                build_frametime_plot(ui, "CPU", &self.compute_time_ms_log.0);
+                ui.add_space(5.0);
+                build_frametime_plot(ui, "GPU", &self.gpu_time_ms_log.0);
+            });
         }
     }
+}
+
+fn build_frametime_plot(ui: &mut egui::Ui, id: impl std::hash::Hash, points: &[f32]) {
+    let points: egui_plot::PlotPoints = points
+        .iter()
+        .enumerate()
+        .map(|(i, v)| [i as f64, *v as f64])
+        .collect();
+
+    egui_plot::Plot::new(id)
+        // .width(width)
+        .height(80.0)
+        .allow_boxed_zoom(false)
+        .allow_double_click_reset(false)
+        .allow_drag(false)
+        .allow_scroll(false)
+        .allow_zoom(false)
+        .show_axes([false, true])
+        .show(ui, |plot| {
+            plot.line(egui_plot::Line::new(points));
+        });
 }

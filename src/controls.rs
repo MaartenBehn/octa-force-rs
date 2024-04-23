@@ -1,7 +1,6 @@
 use glam::{vec2, Vec2};
-use winit::event::{
-    DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent,
-};
+use winit::event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent};
+use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Controls {
@@ -48,99 +47,45 @@ impl Controls {
             Event::WindowEvent { event, .. } => {
                 match event {
                     WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                state,
-                                virtual_keycode,
-                                ..
-                            },
+                        event:
+                        KeyEvent {
+                            physical_key: PhysicalKey::Code(code),
+                            state,
+                            ..
+                        },
                         ..
-                    } => {
-                        if virtual_keycode.is_some() {
-                            match virtual_keycode.unwrap() {
-                                VirtualKeyCode::W => {
-                                    self.w = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::S => {
-                                    self.s = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::A => {
-                                    self.a = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::D => {
-                                    self.d = *state == ElementState::Pressed;
-                                }
+                    } => match *code {
+                        KeyCode::KeyA => {self.a = *state == ElementState::Pressed;}
+                        KeyCode::KeyD => {self.d = *state == ElementState::Pressed;}
+                        KeyCode::KeyS => {self.s = *state == ElementState::Pressed;}
+                        KeyCode::KeyW => {self.w = *state == ElementState::Pressed;}
+                     
+                        KeyCode::ArrowDown => {self.down = *state == ElementState::Pressed;}
+                        KeyCode::ArrowLeft => {self.left = *state == ElementState::Pressed;}
+                        KeyCode::ArrowRight => {self.rigth = *state == ElementState::Pressed;}
+                        KeyCode::ArrowUp => {self.up = *state == ElementState::Pressed;}
 
-                                VirtualKeyCode::Up => {
-                                    self.up = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::Down => {
-                                    self.down = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::Left => {
-                                    self.left = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::Right => {
-                                    self.rigth = *state == ElementState::Pressed;
-                                }
-
-                                VirtualKeyCode::Q => {
-                                    self.q = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::E => {
-                                    self.e = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::R => {
-                                    self.r = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::T => {
-                                    self.t = *state == ElementState::Pressed;
-                                }
-
-                                VirtualKeyCode::LShift => {
-                                    self.lshift = *state == ElementState::Pressed;
-                                }
-
-                                VirtualKeyCode::F1 => {
-                                    self.f1 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F2 => {
-                                    self.f2 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F3 => {
-                                    self.f3 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F4 => {
-                                    self.f4 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F5 => {
-                                    self.f5 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F6 => {
-                                    self.f6 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F7 => {
-                                    self.f7 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F8 => {
-                                    self.f8 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F9 => {
-                                    self.f9 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F10 => {
-                                    self.f10 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F11 => {
-                                    self.f11 = *state == ElementState::Pressed;
-                                }
-                                VirtualKeyCode::F12 => {
-                                    self.f12 = *state == ElementState::Pressed;
-                                }
-
-                                _ => {}
-                            }
-                        }
+                        KeyCode::KeyQ => {self.q = *state == ElementState::Pressed;}
+                        KeyCode::KeyE => {self.e = *state == ElementState::Pressed;}
+                        KeyCode::KeyR => {self.r = *state == ElementState::Pressed;}
+                        KeyCode::KeyT => {self.t = *state == ElementState::Pressed;}
+                        
+                        KeyCode::ShiftLeft => {self.lshift = *state == ElementState::Pressed;}
+                        
+                        KeyCode::F1 => {self.f1 = *state == ElementState::Pressed;}
+                        KeyCode::F2 => {self.f2 = *state == ElementState::Pressed;}
+                        KeyCode::F3 => {self.f3 = *state == ElementState::Pressed;}
+                        KeyCode::F4 => {self.f4 = *state == ElementState::Pressed;}
+                        KeyCode::F5 => {self.f5 = *state == ElementState::Pressed;}
+                        KeyCode::F6 => {self.f6 = *state == ElementState::Pressed;}
+                        KeyCode::F7 => {self.f7 = *state == ElementState::Pressed;}
+                        KeyCode::F8 => {self.f8 = *state == ElementState::Pressed;}
+                        KeyCode::F9 => {self.f9 = *state == ElementState::Pressed;}
+                        KeyCode::F10 => {self.f10 = *state == ElementState::Pressed;}
+                        KeyCode::F11 => {self.f11 = *state == ElementState::Pressed;}
+                        KeyCode::F12 => {self.f12 = *state == ElementState::Pressed;}
+                        
+                        _ => {}
                     }
                     WindowEvent::MouseInput { state, button, .. } => {
                         if *button == MouseButton::Right {

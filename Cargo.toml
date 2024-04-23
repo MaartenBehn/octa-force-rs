@@ -12,13 +12,13 @@ glam = { version = "0.27.0", features = ["serde", "mint"] }
 anyhow = "1.0"
 
 fps_clock = "2.0"
-winit = "0.27"
+winit = { version = "0.29", default-features = false, features = ["rwh_05", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"]}
 ash = { version = "0.37", features = ["linked"] }
 ash-window = "0.12"
 raw-window-handle = "0.5"
 gpu-allocator = { version = "0.25", default-features = false, features = ["vulkan"] }
 
-imgui = { version = "0.11.0", features = ["docking"] }
-imgui-winit-support = "0.11.0"
-# imgui-rs-vulkan-renderer = { git = "https://github.com/MaartenBehn/imgui-rs-vulkan-renderer", features = ["gpu-allocator", "dynamic-rendering"] }
-imgui-rs-vulkan-renderer = { git = "https://github.com/MaartenBehn/imgui-rs-vulkan-renderer.git", tag = "1.13.0", features = ["gpu-allocator", "dynamic-rendering"] }
+egui = "0.26"
+egui_plot = "0.26"
+egui-winit = "0.26"
+egui-ash-renderer = { version = "0.1.0", features = ["gpu-allocator", "dynamic-rendering"]}
