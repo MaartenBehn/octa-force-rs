@@ -55,7 +55,9 @@ impl<'a> ContextBuilder<'a> {
         display_handle: &'a dyn HasRawDisplayHandle,
     ) -> Self {
 
-        let required_extensions = vec!["VK_KHR_swapchain".to_owned()];
+        let required_extensions = vec![
+            "VK_KHR_swapchain".to_owned(),
+            "VK_KHR_dynamic_rendering".to_owned()];
 
         #[cfg(debug_assertions)]
         let wanted_extensions = vec!["VK_KHR_shader_non_semantic_info".to_owned()];

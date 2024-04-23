@@ -289,12 +289,21 @@ impl PhysicalDeviceFeatures {
     }
 
     pub(crate) fn vulkan_features(&mut self) -> PhysicalDeviceFeatures2{
-        PhysicalDeviceFeatures2::builder()
-            .push_next(&mut self.ray_tracing_feature)
-            .push_next(&mut self.acceleration_struct_feature)
-            .push_next(&mut self.features12)
-            .push_next(&mut self.features13)
-            .build()
+        let mut builder = PhysicalDeviceFeatures2::builder();
+        if self.ray_tracing_feature.ray_tracing_pipeline == vk::TRUE {
+            builder = builder.push_next(&mut self.ray_tracing_feature);
+        }
+        if self.acceleration_struct_feature.acceleration_structure == vk::TRUE {
+            builder = builder.push_next(&mut self.acceleration_struct_feature);
+        }
+        if (self.features12.runtime_descriptor_array | self.features12.runtime_descriptor_array) == vk::TRUE {
+            builder = builder.push_next(&mut self.features12);
+        }
+        if (self.features13.dynamic_rendering | self.features13.synchronization2) == vk::TRUE {
+            builder = builder.push_next(&mut self.features13);
+        }
+
+        builder.build()
     }
 }
 
