@@ -4,8 +4,7 @@ pub extern crate egui_winit;
 
 use anyhow::Result;
 use egui::{
-    epaint::{ClippedShape, ImageDelta},
-    ClippedPrimitive, Context as EguiContext, FullOutput, PlatformOutput, RawInput, TextureId,
+    Context as EguiContext, FullOutput, TextureId,
     ViewportId,
 };
 use egui_ash_renderer::{DynamicRendering, Options, Renderer};

@@ -1,4 +1,4 @@
-use crate::{gui, Queue};
+use crate::Queue;
 use std::time::Duration;
 use egui::Align2;
 
@@ -99,7 +99,7 @@ impl FrameStats {
         self.gpu_time = gpu_time;
     }
 
-    pub(crate) fn build_perf_ui(&mut self, ctx: &gui::egui::Context) {
+    pub(crate) fn build_perf_ui(&mut self, ctx: &egui::Context) {
         if matches!(
             self.stats_display_mode,
             StatsDisplayMode::Basic | StatsDisplayMode::Full

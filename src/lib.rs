@@ -21,7 +21,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use egui::{FullOutput, TextureId};
 use vulkan::*;
 use winit::{
     dpi::PhysicalSize,
@@ -135,7 +134,8 @@ pub fn run<A: App + 'static>(app_name: &str, size: UVec2, enable_raytracing: boo
             
             Event::WindowEvent { event, .. } => {
                 base_app.stats_gui.handle_event(&base_app.window, &event);
-                app.on_window_event(&mut base_app, &event);
+                app.on_window_event(&mut base_app, &event)
+                    .expect("Failed in On Window Event");
 
                 match event {
                     // On resize
