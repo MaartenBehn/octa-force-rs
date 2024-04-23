@@ -1,6 +1,6 @@
 use std::ffi::{c_char, c_void, CStr, CString};
 
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use ash::{
     extensions::ext::DebugUtils,
     vk::{self, DebugUtilsMessengerEXT},
@@ -13,6 +13,7 @@ use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, V
 
 const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
+#[allow(dead_code)]
 pub struct Instance {
     pub(crate) inner: AshInstance,
     debug_report_callback: Option<(DebugUtils, DebugUtilsMessengerEXT)>,
@@ -22,7 +23,6 @@ pub struct Instance {
 }
 
 impl Instance {
-    #[allow(unused_mut)]
     pub(crate) fn new(
         entry: &Entry,
         display_handle: &dyn HasRawDisplayHandle,

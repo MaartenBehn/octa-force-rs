@@ -224,20 +224,20 @@ pub(crate) struct PhysicalDeviceFeatures {
 impl PhysicalDeviceFeatures {
     pub(crate) fn new(required_device_features: &Vec<String>) -> PhysicalDeviceFeatures {
         let mut required_features: HashSet<_> = required_device_features.iter().collect();
-        let mut ray_tracing_feature = vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
+        let ray_tracing_feature = vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
             .ray_tracing_pipeline(required_features.take(&"rayTracingPipeline".to_owned()).is_some())
             .build();
 
-        let mut acceleration_struct_feature = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
+        let acceleration_struct_feature = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
             .acceleration_structure(required_features.take(&"accelerationStructure".to_owned()).is_some())
             .build();
 
-        let mut features12 = vk::PhysicalDeviceVulkan12Features::builder()
+        let features12 = vk::PhysicalDeviceVulkan12Features::builder()
             .runtime_descriptor_array(required_features.take(&"runtimeDescriptorArray".to_owned()).is_some())
             .buffer_device_address(required_features.take(&"bufferDeviceAddress".to_owned()).is_some())
             .build();
 
-        let mut features13 = vk::PhysicalDeviceVulkan13Features::builder()
+        let features13 = vk::PhysicalDeviceVulkan13Features::builder()
             .dynamic_rendering(required_features.take(&"dynamicRendering".to_owned()).is_some())
             .synchronization2(required_features.take(&"synchronization2".to_owned()).is_some())
             .build();
