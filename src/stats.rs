@@ -53,7 +53,7 @@ impl Default for FrameStats {
             frame_count: Default::default(),
             fps_counter: Default::default(),
             timer: Default::default(),
-            stats_display_mode: StatsDisplayMode::Basic,
+            stats_display_mode: StatsDisplayMode::None,
         }
     }
 }
