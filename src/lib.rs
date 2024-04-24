@@ -36,11 +36,10 @@ use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use crate::gui::Gui;
 
-const NUM_IN_FLIGHT_FRAMES: usize = 2;
-
 pub struct BaseApp<B: App> {
     phantom: PhantomData<B>,
-    pub num_in_flight_frames: usize,
+    pub num_frames_in_flight: usize,
+    pub num_frames: usize,
 
     frame_stats: FrameStats,
     stats_gui: Gui,
@@ -261,20 +260,23 @@ impl<B: App> BaseApp<B> {
             window.inner_size().width,
             window.inner_size().height,
         )?;
+        let num_frames = swapchain.images.len();
+        let num_frames_in_flight = 2;
 
         let command_buffers = create_command_buffers(&command_pool, &swapchain)?;
 
-        let in_flight_frames = InFlightFrames::new(&context, NUM_IN_FLIGHT_FRAMES)?;
+        let in_flight_frames = InFlightFrames::new(&context, num_frames_in_flight)?;
 
         let controls = Controls::default();
         
         let frame_stats = FrameStats::default();
-        let stats_gui = Gui::new(&context, swapchain.format, &window, NUM_IN_FLIGHT_FRAMES)?;
+        let stats_gui = Gui::new(&context, swapchain.format, &window, num_frames)?;
         
 
         Ok(Self {
             phantom: PhantomData,
-            num_in_flight_frames: NUM_IN_FLIGHT_FRAMES,
+            num_frames_in_flight,
+            num_frames,
             window,
             context,
             command_pool,
@@ -309,7 +311,7 @@ impl<B: App> BaseApp<B> {
 
         // Can't get for gpu time on the first frames or vkGetQueryPoolResults gets stuck
         // due to VK_QUERY_RESULT_WAIT_BIT
-        let gpu_time = (self.frame_stats.total_frame_count >= NUM_IN_FLIGHT_FRAMES)
+        let gpu_time = (self.frame_stats.total_frame_count >= self.num_frames_in_flight)
             .then(|| self.in_flight_frames.gpu_frame_time_ms())
             .transpose()?
             .unwrap_or_default();
@@ -377,7 +379,9 @@ impl<B: App> BaseApp<B> {
 
         base_app.record_render_commands(self, image_index)?;
 
+
         let buffer = &self.command_buffers[image_index];
+
         if self.frame_stats.stats_display_mode != StatsDisplayMode::None {
             buffer.begin_rendering(
                 &self.swapchain.views[image_index],
