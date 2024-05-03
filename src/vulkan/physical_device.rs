@@ -167,6 +167,8 @@ impl PhysicalDevice {
             PresentModeKHR::FIFO_RELAXED,
             PresentModeKHR::FIFO,
             PresentModeKHR::MAILBOX,
+            PresentModeKHR::SHARED_CONTINUOUS_REFRESH,
+            PresentModeKHR::SHARED_DEMAND_REFRESH,
             PresentModeKHR::IMMEDIATE,
         ];
         let mut present_mode = None;

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use ash::{extensions::khr::Swapchain as AshSwapchain, vk};
+use log::debug;
 
 use crate::{vulkan::device::Device, vulkan::Queue, Context, Image, ImageView, Semaphore};
 
@@ -91,6 +92,7 @@ impl Swapchain {
                 .present_mode(context.physical_device.present_mode.unwrap())
                 .clipped(true)
         };
+        debug!("Swapchain Present Mode: {:?}", context.physical_device.present_mode.unwrap());
 
         let inner = AshSwapchain::new(&context.instance.inner, &context.device.inner);
         let swapchain_khr = unsafe { inner.create_swapchain(&create_info, None)? };
