@@ -162,14 +162,19 @@ impl PhysicalDevice {
         };
 
         // Choose Present mode to use
-        let present_mode = if supported_present_modes.len() == 0 {
-            None
-        } else if supported_present_modes.contains(&vk::PresentModeKHR::IMMEDIATE) {
-            Some(PresentModeKHR::IMMEDIATE)
-        } else  {
-            Some(vk::PresentModeKHR::FIFO)
-        };
-
+        // https://www.reddit.com/r/vulkan/comments/4sbpnz/trying_to_understand_presentation_modes/
+        let present_mode_prio = [
+            PresentModeKHR::FIFO_RELAXED,
+            PresentModeKHR::FIFO,
+            PresentModeKHR::MAILBOX,
+            PresentModeKHR::IMMEDIATE,
+        ];
+        let mut present_mode = None;
+        for wanted in present_mode_prio {
+            if supported_present_modes.contains(&wanted) {
+                present_mode = Some(wanted);
+            }
+        }
 
         // Device Features
         let mut required_features = PhysicalDeviceFeatures::new(&required_device_features);

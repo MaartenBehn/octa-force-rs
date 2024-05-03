@@ -175,12 +175,28 @@ impl CommandBuffer {
 
         Ok(())
     }
-
-    // Used with raytracing or compute rendering
-    pub fn swapchain_image_render_barrier_after_copy_form_storage_image(
+    
+    pub fn swapchain_image_copy_from_ray_tracing_storage_image(
         &self,
         storage_image: &Image,
         swapchain_image: &Image,
+    ) -> Result<()> {
+        self.swapchain_image_copy_form_storage_image(storage_image, swapchain_image, vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR)
+    }
+
+    pub fn swapchain_image_copy_from_compute_storage_image(
+        &self,
+        storage_image: &Image,
+        swapchain_image: &Image,
+    ) -> Result<()> {
+        self.swapchain_image_copy_form_storage_image(storage_image, swapchain_image, vk::PipelineStageFlags2::COMPUTE_SHADER)
+    }
+    
+    fn swapchain_image_copy_form_storage_image(
+        &self,
+        storage_image: &Image,
+        swapchain_image: &Image,
+        storage_src_stage_mask: vk::PipelineStageFlags2,
     ) -> Result<()> {
         self.pipeline_image_barriers(&[
             ImageBarrier {
@@ -198,8 +214,7 @@ impl CommandBuffer {
                 new_layout: vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 src_access_mask: vk::AccessFlags2::SHADER_WRITE,
                 dst_access_mask: vk::AccessFlags2::TRANSFER_READ,
-                src_stage_mask: vk::PipelineStageFlags2::COMPUTE_SHADER
-                    | vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR,
+                src_stage_mask: storage_src_stage_mask,
                 dst_stage_mask: vk::PipelineStageFlags2::TRANSFER,
             },
         ]);
