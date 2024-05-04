@@ -175,6 +175,7 @@ impl PhysicalDevice {
         for wanted in present_mode_prio {
             if supported_present_modes.contains(&wanted) {
                 present_mode = Some(wanted);
+                break;
             }
         }
 
