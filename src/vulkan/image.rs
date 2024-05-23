@@ -1,3 +1,4 @@
+use std::mem::align_of;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -9,6 +10,7 @@ use gpu_allocator::{
 };
 
 use crate::{vulkan::device::Device, Context};
+use crate::vulkan::align::Align;
 
 pub struct Image {
     device: Arc<Device>,
@@ -129,6 +131,32 @@ impl Image {
             device: self.device.clone(),
             inner,
         })
+    }
+
+    pub fn copy_data_to_image<T: Copy>(&self, data: &[T]) -> Result<()> {
+        self.copy_data_to_image_complex(data, 0, align_of::<T>())
+    }
+
+    pub fn copy_data_to_image_complex<T: Copy>(
+        &self,
+        data: &[T],
+        offset: usize,
+        alignment: usize,
+    ) -> Result<()> {
+        unsafe {
+            let data_ptr = self
+                .allocation
+                .as_ref()
+                .unwrap()
+                .mapped_ptr()
+                .unwrap()
+                .as_ptr();
+
+            let mut align: Align<T> = Align::new(data_ptr, alignment as _, data.len(), offset);
+            align.copy_from_slice(data);
+        };
+
+        Ok(())
     }
 }
 

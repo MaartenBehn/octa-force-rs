@@ -89,7 +89,7 @@ impl Drop for DescriptorPool {
 
 pub struct DescriptorSet {
     device: Arc<Device>,
-    pub(crate) inner: vk::DescriptorSet,
+    pub inner: vk::DescriptorSet,
 }
 
 impl DescriptorSet {

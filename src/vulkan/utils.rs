@@ -159,6 +159,77 @@ impl Context {
 
         Ok(ImageAndView { image, view })
     }
+
+    pub fn create_live_egui_texture_image(
+        &mut self,
+        format: vk::Format,
+        image_size: UVec2,
+        buffer_size: vk::DeviceSize,
+    ) -> Result<(ImageAndView, Buffer)> {
+
+        let staging_buffer = self.create_buffer(
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            MemoryLocation::CpuToGpu,
+            buffer_size,
+        )?;
+
+        let image = self.create_image(
+            ImageUsageFlags::TRANSFER_DST | ImageUsageFlags::SAMPLED,
+            MemoryLocation::GpuOnly,
+            format,
+            image_size.x,
+            image_size.y,
+        )?;
+
+        let view = image.create_image_view(false)?;
+
+        self.execute_one_time_commands(|cmd_buffer| {
+            cmd_buffer.pipeline_image_barriers(&[ImageBarrier {
+                image: &image,
+                old_layout: vk::ImageLayout::UNDEFINED,
+                new_layout: vk::ImageLayout::GENERAL,
+                src_access_mask: vk::AccessFlags2::NONE,
+                dst_access_mask: vk::AccessFlags2::NONE,
+                src_stage_mask: vk::PipelineStageFlags2::NONE,
+                dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
+            }]);
+        })?;
+
+        Ok((ImageAndView { image, view }, staging_buffer))
+    }
+
+    pub fn copy_live_egui_texture_staging_buffer_to_image(
+        &mut self,
+        staging_buffer: &Buffer,
+        image: &Image,
+    ) -> Result<()> {
+        self.execute_one_time_commands(|cmd_buffer| {
+
+            cmd_buffer.pipeline_image_barriers(&[ImageBarrier {
+                image: &image,
+                old_layout: vk::ImageLayout::GENERAL,
+                new_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                src_access_mask: vk::AccessFlags2::NONE,
+                dst_access_mask: vk::AccessFlags2::NONE,
+                src_stage_mask: vk::PipelineStageFlags2::NONE,
+                dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
+            }]);
+
+            cmd_buffer.copy_buffer_to_image(staging_buffer, image, vk::ImageLayout::TRANSFER_DST_OPTIMAL);
+
+            cmd_buffer.pipeline_image_barriers(&[ImageBarrier {
+                image: &image,
+                old_layout: vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                new_layout: vk::ImageLayout::GENERAL,
+                src_access_mask: vk::AccessFlags2::NONE,
+                dst_access_mask: vk::AccessFlags2::NONE,
+                src_stage_mask: vk::PipelineStageFlags2::NONE,
+                dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
+            }]);
+        })?;
+
+        Ok(())
+    }
 }
 
 impl CommandBuffer {
