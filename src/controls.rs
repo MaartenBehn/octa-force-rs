@@ -32,6 +32,8 @@ pub struct Controls {
     pub f11: bool,
     pub f12: bool,
 
+    pub mouse_right: bool,
+    pub mouse_left: bool,
     pub cursor_delta: Vec2,
     pub scroll_delta: f32,
 }
@@ -89,11 +91,11 @@ impl Controls {
                     }
                     WindowEvent::MouseInput { state, button, .. } => {
                         if *button == MouseButton::Right {
-                            self.rigth = *state == ElementState::Pressed;
+                            self.mouse_right = *state == ElementState::Pressed;
                         }
 
                         if *button == MouseButton::Left {
-                            self.left = *state == ElementState::Pressed;
+                            self.mouse_left = *state == ElementState::Pressed;
                         }
                     }
                     _ => {}
