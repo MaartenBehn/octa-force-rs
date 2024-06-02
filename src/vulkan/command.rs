@@ -2,7 +2,8 @@ use core::slice;
 use std::{mem, sync::Arc};
 
 use anyhow::Result;
-use ash::vk::{self, IndexType};
+use ash::vk::{self, Extent2D, IndexType, Offset2D};
+use glam::Vec2;
 
 use crate::{
     vulkan::device::Device, Buffer, ComputePipeline, Context, DescriptorSet, GraphicsPipeline,
@@ -506,32 +507,42 @@ impl CommandBuffer {
         unsafe { self.device.inner.cmd_end_rendering(self.inner) };
     }
 
-    pub fn set_viewport(&self, extent: vk::Extent2D) {
+    pub fn set_viewport(&self, pos: Vec2, size: Vec2) {
         unsafe {
             self.device.inner.cmd_set_viewport(
                 self.inner,
                 0,
                 &[vk::Viewport {
-                    width: extent.width as _,
-                    height: extent.height as _,
+                    x: pos.x,
+                    y: pos.y,
+                    width: size.x,
+                    height: size.y,
+                    min_depth: 0.0,
                     max_depth: 1.0,
-                    ..Default::default()
                 }],
             )
         };
     }
 
-    pub fn set_scissor(&self, extent: vk::Extent2D) {
+    pub fn set_viewport_size(&self, size: Vec2) {
+        self.set_viewport(Vec2::ZERO, size)
+    }
+
+    pub fn set_scissor(&self, pos: Vec2, size: Vec2) {
         unsafe {
             self.device.inner.cmd_set_scissor(
                 self.inner,
                 0,
                 &[vk::Rect2D {
-                    extent,
-                    ..Default::default()
+                    offset: Offset2D {x: pos.x as i32, y: pos.y as i32},
+                    extent: Extent2D {width: size.x as u32, height: size.y as u32 },
                 }],
             )
         };
+    }
+
+    pub fn set_scissor_size(&self, size: Vec2) {
+        self.set_scissor(Vec2::ZERO, size)
     }
 
     pub fn reset_all_timestamp_queries_from_pool<const C: usize>(

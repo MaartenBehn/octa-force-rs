@@ -1,7 +1,7 @@
 use ash::vk::Extent2D;
 use std::time::Duration;
 
-use glam::{vec3, Mat3, Mat4, Quat, Vec3};
+use glam::{vec3, Mat3, Mat4, Quat, Vec3, Vec2};
 
 use crate::controls::Controls;
 
@@ -41,16 +41,20 @@ impl Camera {
         }
     }
 
-    pub fn base(extent: Extent2D) -> Self {
+    pub fn base(size: Vec2) -> Self {
         Self::new(
             vec3(0.0, 0.0, 1.0),
             vec3(0.0, 0.0, -1.0),
             60.0,
-            extent.width as f32 / extent.height as f32,
+            size.x / size.y,
             0.1,
             10.0,
             vec3(0.0, 1.0, 0.0),
         )
+    }
+    
+    pub fn set_screen_size(&mut self, size: Vec2) {
+        self.aspect_ratio = size.x / size.y
     }
 
     pub fn update(&mut self, controls: &Controls, delta_time: Duration) {
@@ -58,7 +62,7 @@ impl Camera {
         let side = self.direction.cross(self.up);
 
         // Update direction
-        let new_direction = if controls.rigth {
+        let new_direction = if controls.mouse_right {
             let side_rot = Quat::from_axis_angle(side, -controls.cursor_delta[1] * ANGLE_PER_POINT);
             let up_rot =
                 Quat::from_axis_angle(self.up, -controls.cursor_delta[0] * ANGLE_PER_POINT);
