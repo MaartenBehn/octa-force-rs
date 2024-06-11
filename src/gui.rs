@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ash::vk::Extent2D;
 use egui::{
     Context as EguiContext, FullOutput, TextureId,
     ViewportId,
@@ -6,6 +7,7 @@ use egui::{
 use egui_ash_renderer::{DynamicRendering, Options, Renderer};
 use egui_winit::State as EguiWinit;
 use egui_winit::winit::window::Window;
+use glam::UVec2;
 use crate::vulkan::{ash::vk, CommandBuffer, Context as VkContext, Context};
 use winit::{event::WindowEvent};
 
@@ -19,7 +21,8 @@ pub struct Gui {
 impl Gui {
     pub fn new(
         context: &VkContext,
-        format: vk::Format,
+        color_attachment_format: vk::Format,
+        depth_attachment_format: vk::Format,
         window: &Window,
         in_flight_frames: usize,
     ) -> Result<Self> {
@@ -30,8 +33,8 @@ impl Gui {
             context.allocator.clone(),
             context.device.inner.clone(),
             DynamicRendering {
-                color_attachment_format: format,
-                depth_attachment_format: None,
+                color_attachment_format,
+                depth_attachment_format: Some(depth_attachment_format),
             },
             Options {
                 in_flight_frames,
@@ -54,7 +57,7 @@ impl Gui {
     pub fn cmd_draw<F: FnOnce(&egui::Context)>(
         &mut self,
         command_buffer: &CommandBuffer,
-        extent: vk::Extent2D,
+        size: UVec2,
         image_index: usize,
         window: &Window,
         context: &Context,
@@ -88,7 +91,11 @@ impl Gui {
 
         let primitives = self.egui.tessellate(shapes, pixels_per_point);
         
-        self.renderer.cmd_draw(command_buffer.inner, extent, pixels_per_point, &primitives)?;
+        self.renderer.cmd_draw(
+            command_buffer.inner,
+            Extent2D{width: size.x, height: size.y},
+            pixels_per_point,
+            &primitives)?;
 
         Ok(())
     }

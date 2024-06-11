@@ -17,7 +17,7 @@ pub struct GraphicsPipelineCreateInfo<'a> {
     pub extent: Option<vk::Extent2D>,
     pub color_attachment_format: vk::Format,
     pub color_attachment_blend: Option<vk::PipelineColorBlendAttachmentState>,
-    pub depth_attachment_format: Option<vk::Format>,
+    pub depth_attachment_format: vk::Format,
     pub dynamic_states: Option<&'a [vk::DynamicState]>,
 }
 
@@ -144,15 +144,11 @@ impl GraphicsPipeline {
         let color_attachment_formats = [create_info.color_attachment_format];
         let mut rendering_info = vk::PipelineRenderingCreateInfo::builder()
             .color_attachment_formats(&color_attachment_formats)
-            .depth_attachment_format(
-                create_info
-                    .depth_attachment_format
-                    .unwrap_or(vk::Format::UNDEFINED),
-            );
+            .depth_attachment_format(create_info.depth_attachment_format);
 
         // Depth
         let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
-            .depth_test_enable(create_info.depth_attachment_format.is_some())
+            .depth_test_enable(true)
             .depth_write_enable(true)
             .depth_compare_op(vk::CompareOp::LESS)
             .depth_bounds_test_enable(false)

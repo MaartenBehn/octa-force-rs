@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Result};
 use ash::{vk, Entry};
-use ash::vk::{PhysicalDeviceType, SurfaceFormatKHR};
+use ash::vk::{Format, PhysicalDeviceType, SurfaceFormatKHR};
 use gpu_allocator::{
     vulkan::{Allocator, AllocatorCreateDesc},
     AllocatorDebugSettings,
@@ -45,6 +45,7 @@ pub struct ContextBuilder<'a> {
     required_extensions: Vec<String>,
     wanted_extensions: Vec<String>,
     wanted_surface_formats: Vec<SurfaceFormatKHR>,
+    wanted_depth_formats: Vec<Format>,
     required_device_features: Vec<String>,
     wanted_device_features: Vec<String>,
 }
@@ -76,6 +77,7 @@ impl<'a> ContextBuilder<'a> {
             required_extensions,
             wanted_extensions,
             wanted_surface_formats: Vec::new(),
+            wanted_depth_formats: Vec::new(),
             required_device_features,
             wanted_device_features: Vec::new(),
         }
@@ -123,6 +125,13 @@ impl<'a> ContextBuilder<'a> {
         }
     }
 
+    pub fn wanted_depth_formats(self, wanted_depth_formats: Vec<Format>) -> Self {
+        Self {
+            wanted_depth_formats,
+            ..self
+        }
+    }
+
     pub fn required_device_features(self, required_device_features: Vec<&str>) -> Self {
         let mut features = self.required_device_features;
         features.extend(required_device_features.into_iter().map(|a| a.to_owned()));
@@ -162,6 +171,7 @@ impl Context {
             required_extensions,
             wanted_extensions,
             wanted_surface_formats,
+            wanted_depth_formats,
             required_device_features,
             wanted_device_features
         }: ContextBuilder,
@@ -178,6 +188,7 @@ impl Context {
             &required_extensions,
             &wanted_extensions,
             &wanted_surface_formats,
+            &wanted_depth_formats,
             &required_device_features,
             &wanted_device_features,
         )?;

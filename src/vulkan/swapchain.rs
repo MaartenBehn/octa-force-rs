@@ -2,9 +2,13 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use ash::{extensions::khr::Swapchain as AshSwapchain, vk};
+use ash::vk::{ImageUsageFlags};
+use glam::{UVec2, uvec2};
+use gpu_allocator::MemoryLocation;
 use log::debug;
 
-use crate::{vulkan::device::Device, vulkan::Queue, Context, Image, ImageView, Semaphore};
+use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore, ImageAndView};
+use crate::vulkan::Image;
 
 pub struct AcquiredImage {
     pub index: u32,
@@ -15,12 +19,13 @@ pub struct Swapchain {
     device: Arc<Device>,
     inner: AshSwapchain,
     swapchain_khr: vk::SwapchainKHR,
-    pub extent: vk::Extent2D,
+    pub size: UVec2,
     pub format: vk::Format,
+    pub depth_format: vk::Format,
     pub color_space: vk::ColorSpaceKHR,
     pub present_mode: vk::PresentModeKHR,
-    pub images: Vec<Image>,
-    pub views: Vec<ImageView>,
+    pub images_and_views: Vec<ImageAndView>,
+    pub depht_images_and_views: Vec<ImageAndView>,
 }
 
 impl Swapchain {
@@ -51,7 +56,7 @@ impl Swapchain {
                 vk::Extent2D { width, height }
             }
         };
-        log::debug!("Swapchain extent: {extent:?}");
+        log::debug!("Swapchain size: {}x{}", extent.width, extent.height);
 
         // Swapchain image count
         let image_count = capabilities.min_image_count + 1;
@@ -64,7 +69,12 @@ impl Swapchain {
         ];
 
         let format = context.physical_device.surface_format.unwrap();
+        let depth_format = context.physical_device.depth_format.unwrap();
         let present_mode = context.physical_device.present_mode.unwrap();
+
+        debug!("Swapchain present mode: {:?}", context.physical_device.present_mode.unwrap());
+        log::debug!("Swapchain format: {:?}", format.format);
+        log::debug!("Swapchain depth format: {:?}", depth_format);
 
         let create_info = {
             let mut builder = vk::SwapchainCreateInfoKHR::builder()
@@ -92,41 +102,53 @@ impl Swapchain {
                 .present_mode(context.physical_device.present_mode.unwrap())
                 .clipped(true)
         };
-        debug!("Swapchain Present Mode: {:?}", context.physical_device.present_mode.unwrap());
 
         let inner = AshSwapchain::new(&context.instance.inner, &context.device.inner);
         let swapchain_khr = unsafe { inner.create_swapchain(&create_info, None)? };
 
         // Swapchain images and image views
         let images = unsafe { inner.get_swapchain_images(swapchain_khr)? };
-        let images = images
+        let images_and_views = images
             .into_iter()
             .map(|i| {
-                Image::from_swapchain_image(
+                let image = Image::from_swapchain_image(
                     device.clone(),
                     context.allocator.clone(),
                     i,
                     format.format,
                     extent,
-                )
+                );
+                let view = image.create_image_view(false).unwrap();
+                ImageAndView{ view, image }
             })
             .collect::<Vec<_>>();
 
-        let views = images
-            .iter()
-            .map(|x| Image::create_image_view(x, false))
-            .collect::<Result<Vec<_>, _>>()?;
+        let depht_images_and_views = (0..images_and_views.len())
+            .into_iter()
+            .map(|_| {
+                let depth_image = context.create_image(
+                    ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+                    MemoryLocation::GpuOnly,
+                    depth_format,
+                    extent.width,
+                    extent.height,
+                ).unwrap();
+                let depth_view = depth_image.create_image_view(true).unwrap();
+                ImageAndView{ view: depth_view, image: depth_image }
+            })
+            .collect::<Vec<_>>();
 
         Ok(Self {
             device,
             inner,
             swapchain_khr,
-            extent,
+            size: uvec2(extent.width, extent.height),
             format: format.format,
+            depth_format,
             color_space: format.color_space,
             present_mode,
-            images,
-            views,
+            images_and_views,
+            depht_images_and_views,
         })
     }
 
@@ -199,28 +221,40 @@ impl Swapchain {
 
         // Swapchain images and image views
         let images = unsafe { self.inner.get_swapchain_images(swapchain_khr)? };
-        let images = images
+        let images_and_views = images
             .into_iter()
             .map(|i| {
-                Image::from_swapchain_image(
+                let image = Image::from_swapchain_image(
                     self.device.clone(),
                     context.allocator.clone(),
                     i,
                     self.format,
                     extent,
-                )
+                );
+                let view = image.create_image_view(false).unwrap();
+                ImageAndView{ view, image }
             })
             .collect::<Vec<_>>();
 
-        let views = images
-            .iter()
-            .map(|x| Image::create_image_view(x, false))
-            .collect::<Result<Vec<_>, _>>()?;
+        let depht_images_and_views = (0..images_and_views.len())
+            .into_iter()
+            .map(|_| {
+                let depth_image = context.create_image(
+                    ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+                    MemoryLocation::GpuOnly,
+                    self.depth_format,
+                    extent.width,
+                    extent.height,
+                ).unwrap();
+                let depth_view = depth_image.create_image_view(true).unwrap();
+                ImageAndView{ view: depth_view, image: depth_image }
+            })
+            .collect::<Vec<_>>();
 
         self.swapchain_khr = swapchain_khr;
-        self.extent = extent;
-        self.images = images;
-        self.views = views;
+        self.size = uvec2(extent.width, extent.height);
+        self.images_and_views = images_and_views;
+        self.depht_images_and_views = depht_images_and_views;
 
         Ok(())
     }
@@ -263,8 +297,8 @@ impl Swapchain {
 
     fn destroy(&mut self) {
         unsafe {
-            self.views.clear();
-            self.images.clear();
+            self.images_and_views.clear();
+            self.depht_images_and_views.clear();
             self.inner.destroy_swapchain(self.swapchain_khr, None);
         }
     }

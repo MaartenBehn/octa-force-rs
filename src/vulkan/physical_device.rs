@@ -3,7 +3,7 @@ use std::ffi::CStr;
 
 use anyhow::Result;
 use ash::{vk, Instance};
-use ash::vk::{PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
+use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
 
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
 
@@ -29,6 +29,9 @@ pub struct PhysicalDevice {
     pub supported_surface_formats: Vec<SurfaceFormatKHR>,
     pub surface_format: Option<SurfaceFormatKHR>,
 
+    pub supported_depth_formats: Vec<Format>,
+    pub depth_format: Option<Format>,
+
     pub supported_present_modes: Vec<PresentModeKHR>,
     pub present_mode: Option<PresentModeKHR>,
 
@@ -44,11 +47,12 @@ impl PhysicalDevice {
         instance: &Instance,
         surface: &Surface,
         inner: vk::PhysicalDevice,
-        required_extensions: &Vec<String>,
-        wanted_extensions: &Vec<String>,
-        wanted_surface_formats: &Vec<SurfaceFormatKHR>,
-        required_device_features: &Vec<String>,
-        wanted_device_features: &Vec<String>,
+        required_extensions: &[String],
+        wanted_extensions: &[String],
+        wanted_surface_formats: &[SurfaceFormatKHR],
+        wanted_depth_formats: &[Format],
+        required_device_features: &[String],
+        wanted_device_features: &[String],
     ) -> Result<Self> {
         let props = unsafe { instance.get_physical_device_properties(inner) };
 
@@ -142,17 +146,47 @@ impl PhysicalDevice {
                 .get_physical_device_surface_formats(inner, surface.surface_khr)?
         };
 
-        // Choose Surface Format to use
-        let surface_format = if supported_surface_formats.len() == 0 {
-            None
-        } else {
-            Some(wanted_surface_formats.iter().find(|wanted_format| {
-                supported_surface_formats.iter().find(|format| {
-                    format.format == wanted_format.format && format.color_space == wanted_format.color_space
-                    // Base: B8G8R8A8_UNORM SRGB_NONLINEAR
-                }).is_some()
-            }).unwrap_or(&supported_surface_formats[0]).to_owned())
-        };
+        // Choose Surface Format
+        let surface_format = wanted_surface_formats.iter().find(|wanted_format| {
+            supported_surface_formats.iter().find(|format| {
+                format.format == wanted_format.format && format.color_space == wanted_format.color_space
+                // Base: B8G8R8A8_UNORM SRGB_NONLINEAR
+            }).is_some()
+        });
+        let surface_format = if surface_format.is_some() {
+            Some(surface_format.unwrap().to_owned())
+        } else if !supported_surface_formats.is_empty() {
+            Some(supported_surface_formats[0])
+        } else { None };
+
+
+        // Depth Formats
+        let all_depth_formats = [
+            Format::D32_SFLOAT,
+            Format::D32_SFLOAT_S8_UINT,
+            Format::D16_UNORM,
+            Format::D16_UNORM_S8_UINT,
+            Format::D24_UNORM_S8_UINT
+        ];
+
+        let supported_depth_formats = all_depth_formats.into_iter().filter(|format| {
+            unsafe {
+                let property = instance.get_physical_device_format_properties(inner, *format);
+                property.optimal_tiling_features.contains(FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT)
+            }
+        }).collect::<Vec<_>>();
+
+        // Choose Depth Format
+        let depth_format = wanted_depth_formats.iter().find(|wanted_format| {
+            supported_depth_formats.iter().find(|format| {
+                format == wanted_format
+            }).is_some()
+        });
+        let depth_format = if depth_format.is_some() {
+            Some(depth_format.unwrap().to_owned())
+        } else if !supported_depth_formats.is_empty() {
+            Some(supported_depth_formats[0])
+        } else { None };
 
         // Present Mode
         let supported_present_modes = unsafe {
@@ -180,13 +214,13 @@ impl PhysicalDevice {
         }
 
         // Device Features
-        let mut required_features = PhysicalDeviceFeatures::new(&required_device_features);
+        let mut required_features = PhysicalDeviceFeatures::new(required_device_features);
         unsafe { instance.get_physical_device_features2(inner, &mut required_features.vulkan_features()) };
-        let (required_device_features_ok, required_device_features) = required_features.result(&required_device_features);
+        let (required_device_features_ok, required_device_features) = required_features.result(required_device_features);
 
-        let mut wanted_features = PhysicalDeviceFeatures::new(&wanted_device_features);
+        let mut wanted_features = PhysicalDeviceFeatures::new(wanted_device_features);
         unsafe { instance.get_physical_device_features2(inner, &mut wanted_features.vulkan_features()) };
-        let (wanted_device_features_ok, wanted_device_features) = wanted_features.result(&wanted_device_features);
+        let (wanted_device_features_ok, wanted_device_features) = wanted_features.result(wanted_device_features);
 
 
         Ok(Self {
@@ -210,6 +244,9 @@ impl PhysicalDevice {
             supported_surface_formats,
             surface_format,
 
+            supported_depth_formats,
+            depth_format,
+
             supported_present_modes,
             present_mode,
 
@@ -230,7 +267,7 @@ pub(crate) struct PhysicalDeviceFeatures {
 }
 
 impl PhysicalDeviceFeatures {
-    pub(crate) fn new(required_device_features: &Vec<String>) -> PhysicalDeviceFeatures {
+    pub(crate) fn new(required_device_features: &[String]) -> PhysicalDeviceFeatures {
         let mut required_features: HashSet<_> = required_device_features.iter().collect();
         let ray_tracing_feature = vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
             .ray_tracing_pipeline(required_features.take(&"rayTracingPipeline".to_owned()).is_some())
@@ -257,7 +294,7 @@ impl PhysicalDeviceFeatures {
         PhysicalDeviceFeatures {ray_tracing_feature, acceleration_struct_feature, features12, features13}
     }
 
-    pub(crate) fn result(&self, required_device_features: &Vec<String>) -> (bool, HashMap<String, bool>) {
+    pub(crate) fn result(&self, required_device_features: &[String]) -> (bool, HashMap<String, bool>) {
         let mut required_features: HashSet<_> = required_device_features.iter().collect();
         let mut result = HashMap::new();
         let mut all = true;

@@ -1,4 +1,3 @@
-use ash::vk::Extent2D;
 use std::time::Duration;
 
 use glam::{vec3, Mat3, Mat4, Quat, Vec3, Vec2};

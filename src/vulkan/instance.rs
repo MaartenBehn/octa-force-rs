@@ -6,7 +6,7 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
-use ash::vk::SurfaceFormatKHR;
+use ash::vk::{Format, SurfaceFormatKHR};
 use raw_window_handle::HasRawDisplayHandle;
 
 use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, Version};
@@ -93,18 +93,28 @@ impl Instance {
     pub(crate) fn enumerate_physical_devices(
         &mut self,
         surface: &Surface,
-        required_extensions: &Vec<String>,
-        wanted_extensions: &Vec<String>,
-        wanted_surface_formats: &Vec<SurfaceFormatKHR>,
-        required_device_features: &Vec<String>,
-        wanted_device_features: &Vec<String>,
+        required_extensions: &[String],
+        wanted_extensions: &[String],
+        wanted_surface_formats: &[SurfaceFormatKHR],
+        wanted_depth_formats: &[Format],
+        required_device_features: &[String],
+        wanted_device_features: &[String],
     ) -> Result<&[PhysicalDevice]> {
         if self.physical_devices.is_empty() {
             let physical_devices = unsafe { self.inner.enumerate_physical_devices()? };
 
             let physical_devices = physical_devices
                 .into_iter()
-                .map(|pd| PhysicalDevice::new(&self.inner, surface, pd, required_extensions, wanted_extensions, wanted_surface_formats, required_device_features, wanted_device_features))
+                .map(|pd| PhysicalDevice::new(
+                    &self.inner,
+                    surface,
+                    pd,
+                    required_extensions,
+                    wanted_extensions,
+                    wanted_surface_formats,
+                    wanted_depth_formats,
+                    required_device_features,
+                    wanted_device_features))
                 .collect::<Result<Vec<_>>>()?;
 
             self.physical_devices = physical_devices;

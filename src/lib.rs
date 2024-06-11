@@ -260,7 +260,7 @@ impl<B: App> BaseApp<B> {
             window.inner_size().width,
             window.inner_size().height,
         )?;
-        let num_frames = swapchain.images.len();
+        let num_frames = swapchain.images_and_views.len();
         let num_frames_in_flight = 2;
 
         let command_buffers = create_command_buffers(&command_pool, &swapchain)?;
@@ -270,7 +270,7 @@ impl<B: App> BaseApp<B> {
         let controls = Controls::default();
         
         let frame_stats = FrameStats::default();
-        let stats_gui = Gui::new(&context, swapchain.format, &window, num_frames)?;
+        let stats_gui = Gui::new(&context, swapchain.format, swapchain.depth_format,  &window, num_frames)?;
         
 
         Ok(Self {
@@ -384,16 +384,16 @@ impl<B: App> BaseApp<B> {
 
         if self.frame_stats.stats_display_mode != StatsDisplayMode::None {
             buffer.begin_rendering(
-                &self.swapchain.views[image_index],
-                None,
-                self.swapchain.extent,
+                &self.swapchain.images_and_views[image_index].view,
+                &self.swapchain.depht_images_and_views[image_index].view,
+                self.swapchain.size,
                 vk::AttachmentLoadOp::DONT_CARE,
                 None,
             );
 
             self.stats_gui.cmd_draw(
                 buffer, 
-                self.swapchain.extent, 
+                self.swapchain.size,
                 image_index,
                 &self.window, 
                 &self.context,
@@ -405,7 +405,7 @@ impl<B: App> BaseApp<B> {
             buffer.end_rendering();
         }
 
-        buffer.swapchain_image_present_barrier(&self.swapchain.images[image_index])?;
+        buffer.swapchain_image_present_barrier(&self.swapchain.images_and_views[image_index].image)?;
         buffer.write_timestamp(
             vk::PipelineStageFlags2::ALL_COMMANDS,
             self.in_flight_frames.timing_query_pool(),
@@ -418,7 +418,7 @@ impl<B: App> BaseApp<B> {
 }
 
 fn create_command_buffers(pool: &CommandPool, swapchain: &Swapchain) -> Result<Vec<CommandBuffer>> {
-    pool.allocate_command_buffers(vk::CommandBufferLevel::PRIMARY, swapchain.images.len() as _)
+    pool.allocate_command_buffers(vk::CommandBufferLevel::PRIMARY, swapchain.images_and_views.len() as _)
 }
 
 pub struct ImageAndView {
