@@ -1,20 +1,27 @@
 use core::slice;
 use std::{mem, sync::Arc};
-
 use anyhow::Result;
 use ash::vk::{self, Extent2D, IndexType, Offset2D};
 use glam::{UVec2, Vec2};
-
 use crate::{
     vulkan::device::Device, Buffer, ComputePipeline, Context, DescriptorSet, GraphicsPipeline,
     Image, ImageView, PipelineLayout, QueueFamily, RayTracingContext, RayTracingPipeline,
     ShaderBindingTable, TimestampQueryPool,
 };
 
+#[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+use ash::extensions::khr::{DynamicRendering, Synchronization2};
+
 pub struct CommandPool {
     device: Arc<Device>,
     ray_tracing: Option<Arc<RayTracingContext>>,
     pub inner: vk::CommandPool,
+
+    #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+    synchronization2: Synchronization2,
+
+    #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+    dynamic_rendering: DynamicRendering
 }
 
 impl CommandPool {
@@ -23,6 +30,12 @@ impl CommandPool {
         ray_tracing: Option<Arc<RayTracingContext>>,
         queue_family: QueueFamily,
         flags: Option<vk::CommandPoolCreateFlags>,
+
+        #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+        synchronization2: Synchronization2,
+
+        #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+        dynamic_rendering: DynamicRendering
     ) -> Result<Self> {
         let flags = flags.unwrap_or_else(vk::CommandPoolCreateFlags::empty);
 
@@ -35,6 +48,12 @@ impl CommandPool {
             device,
             ray_tracing,
             inner,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            synchronization2,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            dynamic_rendering
         })
     }
 
@@ -55,14 +74,23 @@ impl CommandPool {
                 device: self.device.clone(),
                 ray_tracing: self.ray_tracing.clone(),
                 inner,
+
+                #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+                synchronization2: self.synchronization2.to_owned(),
+
+                #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+                dynamic_rendering: self.dynamic_rendering.to_owned(),
             })
             .collect();
 
         Ok(buffers)
     }
 
-    pub fn allocate_command_buffer(&self, level: vk::CommandBufferLevel) -> Result<CommandBuffer> {
-        let buffers = self.allocate_command_buffers(level, 1)?;
+    pub fn allocate_command_buffer(
+        &self,
+        level: vk::CommandBufferLevel,
+    ) -> Result<CommandBuffer> {
+        let buffers = self.allocate_command_buffers(level, 1, )?;
         let buffer = buffers.into_iter().next().unwrap();
 
         Ok(buffer)
@@ -86,12 +114,19 @@ impl Context {
         &self,
         queue_family: QueueFamily,
         flags: Option<vk::CommandPoolCreateFlags>,
+
     ) -> Result<CommandPool> {
         CommandPool::new(
             self.device.clone(),
             self.ray_tracing.clone(),
             queue_family,
             flags,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            self.synchronization2.to_owned(),
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            self.dynamic_rendering.to_owned(),
         )
     }
 }
@@ -106,6 +141,12 @@ pub struct CommandBuffer {
     device: Arc<Device>,
     ray_tracing: Option<Arc<RayTracingContext>>,
     pub inner: vk::CommandBuffer,
+
+    #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+    synchronization2: Synchronization2,
+
+    #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+    dynamic_rendering: DynamicRendering
 }
 
 impl CommandBuffer {
@@ -347,6 +388,11 @@ impl CommandBuffer {
         let dependency_info = vk::DependencyInfo::builder().image_memory_barriers(&barriers);
 
         unsafe {
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            self.synchronization2
+                .cmd_pipeline_barrier2(self.inner, &dependency_info);
+
+            #[cfg(vulkan_1_3)]
             self.device
                 .inner
                 .cmd_pipeline_barrier2(self.inner, &dependency_info)
@@ -494,6 +540,11 @@ impl CommandBuffer {
         rendering_info = rendering_info.depth_attachment(&depth_attachment_info);
 
         unsafe {
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            self.dynamic_rendering
+                .cmd_begin_rendering(self.inner, &rendering_info);
+
+            #[cfg(vulkan_1_3)]
             self.device
                 .inner
                 .cmd_begin_rendering(self.inner, &rendering_info)
@@ -501,7 +552,13 @@ impl CommandBuffer {
     }
 
     pub fn end_rendering(&self) {
-        unsafe { self.device.inner.cmd_end_rendering(self.inner) };
+        unsafe {
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            self.dynamic_rendering.cmd_end_rendering(self.inner);
+
+            #[cfg(vulkan_1_3)]
+            self.device.inner.cmd_end_rendering(self.inner);
+        };
     }
 
     pub fn set_viewport(&self, pos: Vec2, size: Vec2) {
@@ -562,9 +619,15 @@ impl CommandBuffer {
         assert!(query_index < C as _, "Query index must be < {C}");
 
         unsafe {
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            self.synchronization2
+                .cmd_write_timestamp2(self.inner, stage, pool.inner, query_index);
+
+
+            #[cfg(vulkan_1_3)]
             self.device
                 .inner
-                .cmd_write_timestamp2(self.inner, stage, pool.inner, query_index)
+                .cmd_write_timestamp2(self.inner, stage, pool.inner, query_index);
         }
     }
 }

@@ -23,6 +23,7 @@ mod sync;
 pub mod push_constant;
 pub mod utils;
 
+use std::fmt::{Debug, Formatter};
 pub use buffer::*;
 pub use command::*;
 pub use context::*;
@@ -37,54 +38,32 @@ pub use sampler::*;
 pub use swapchain::*;
 pub use sync::*;
 
-pub const VERSION_1_0: Version = Version::from_major_minor(1, 0);
-pub const VERSION_1_1: Version = Version::from_major_minor(1, 1);
-pub const VERSION_1_2: Version = Version::from_major_minor(1, 2);
-pub const VERSION_1_3: Version = Version::from_major_minor(1, 3);
-
-#[derive(Debug, Clone, Copy)]
-pub struct Version {
-    pub variant: u32,
-    pub major: u32,
-    pub minor: u32,
-    pub patch: u32,
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum Version {
+    VK_1_0,
+    VK_1_1,
+    VK_1_2,
+    VK_1_3,
 }
 
 impl Version {
-    pub const fn new(variant: u32, major: u32, minor: u32, patch: u32) -> Self {
-        Self {
-            variant,
-            major,
-            minor,
-            patch,
-        }
-    }
-
-    pub const fn from_major(major: u32) -> Self {
-        Self {
-            major,
-            ..Self::default()
-        }
-    }
-
-    pub const fn from_major_minor(major: u32, minor: u32) -> Self {
-        Self {
-            major,
-            minor,
-            ..Self::default()
-        }
-    }
-
-    const fn default() -> Self {
-        Self {
-            variant: 0,
-            major: 0,
-            minor: 0,
-            patch: 0,
-        }
-    }
-
     pub(crate) fn make_api_version(&self) -> u32 {
-        ash::vk::make_api_version(self.variant, self.major, self.minor, self.patch)
+        match self {
+            Version::VK_1_0 => {ash::vk::make_api_version(0, 1, 0, 0)}
+            Version::VK_1_1 => {ash::vk::make_api_version(0, 1, 1, 0)}
+            Version::VK_1_2 => {ash::vk::make_api_version(0, 1, 2, 0)}
+            Version::VK_1_3 => {ash::vk::make_api_version(0, 1, 3, 0)}
+        }
+    }
+}
+
+impl Debug for Version {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Version::VK_1_0 => {f.write_str("1.0.")}
+            Version::VK_1_1 => {f.write_str("1.1.")}
+            Version::VK_1_2 => {f.write_str("1.2.")}
+            Version::VK_1_3 => {f.write_str("1.3.")}
+        }
     }
 }

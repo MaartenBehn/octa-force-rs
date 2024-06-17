@@ -6,14 +6,11 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
-use ash::extensions::khr::Synchronization2;
 use ash::vk::{Format, SurfaceFormatKHR};
-use log::{debug, info};
 use raw_window_handle::HasRawDisplayHandle;
 
-use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, Version, EngineConfig};
+use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, EngineConfig};
 use crate::EngineFeatureValue::{Needed, NotUsed};
-use crate::vulkan::{VERSION_1_0, VERSION_1_1, VERSION_1_2, VERSION_1_3};
 
 #[allow(dead_code)]
 pub struct Instance {
@@ -22,7 +19,6 @@ pub struct Instance {
     physical_devices: Vec<PhysicalDevice>,
     pub(crate) validation_layers: bool,
     pub(crate) debug_printing: bool,
-    pub(crate) version: Version,
 }
 
 impl Instance {
@@ -32,60 +28,16 @@ impl Instance {
         engine_config: &EngineConfig,
     ) -> Result<Self> {
 
-
-        // Find supported Vulkan Version
-        let implemented_vulkan_versions = [
-            VERSION_1_0,
-            VERSION_1_1,
-            VERSION_1_2,
-            VERSION_1_3,
-        ];
-
-        let res = entry.try_enumerate_instance_version();
-        if res.is_err() {
-            bail!("No Vulkan Version found. Check if the Vulkan SDK is properly installed.");
-        }
-        let res = res.unwrap();
-        if res.is_none() {
-            bail!("No Vulkan Version found. Check if the Vulkan SDK is properly installed.");
-        }
-
-        let version = res.unwrap();
-        let mut supported_vulkan_versions = vec![];
-        for test_version in implemented_vulkan_versions {
-            if version >= test_version.make_api_version() {
-                supported_vulkan_versions.push(test_version)
-            }
-        }
-
-        if supported_vulkan_versions.is_empty() {
-            bail!("Vulkan Version is not supported by octaforce. The lowest supported Vulkan Version is 1.2. ");
-        }
-
-        let picked_version = if engine_config.wanted_vulkan_version.is_some() {
-            let mut found = true;
-            for test_version in supported_vulkan_versions.iter() {
-                if test_version.make_api_version() == engine_config.wanted_vulkan_version.unwrap().make_api_version() {
-                    found = true;
-                }
-            }
-
-            if found {
-                engine_config.wanted_vulkan_version.unwrap()
-            } else {
-                info!("Wanted Vulkan Version {:?} not supported", engine_config.wanted_vulkan_version.unwrap());
-                supported_vulkan_versions[supported_vulkan_versions.len() - 1]
-            }
-        } else {
-            supported_vulkan_versions[supported_vulkan_versions.len() - 1]
-        };
-        info!("Using Vulkan Version {}.{}.{}", picked_version.major, picked_version.minor, picked_version.patch);
+        #[cfg(vulkan_1_0)] let version = crate::vulkan::Version::VK_1_0;
+        #[cfg(vulkan_1_1)] let version = crate::vulkan::Version::VK_1_1;
+        #[cfg(vulkan_1_2)] let version = crate::vulkan::Version::VK_1_2;
+        #[cfg(vulkan_1_3)] let version = crate::vulkan::Version::VK_1_3;
 
         // Vulkan instance
         let app_name = CString::new(engine_config.name.as_bytes())?;
         let app_info = vk::ApplicationInfo::builder()
             .application_name(app_name.as_c_str())
-            .api_version(picked_version.make_api_version());
+            .api_version(version.make_api_version());
 
         let mut extension_names =
             ash_window::enumerate_required_extensions(display_handle.raw_display_handle())?
@@ -152,7 +104,6 @@ impl Instance {
             physical_devices: vec![],
             validation_layers,
             debug_printing,
-            version: picked_version
         })
     }
 

@@ -2,13 +2,15 @@ use std::{ffi::CString, sync::Arc};
 
 use anyhow::Result;
 use ash::{vk, Device as AshDevice};
-
 use crate::{
     vulkan::instance::Instance,
     vulkan::physical_device::PhysicalDevice,
     vulkan::queue::{Queue, QueueFamily},
 };
 use crate::vulkan::physical_device::PhysicalDeviceFeatures;
+
+#[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+use ash::extensions::khr::Synchronization2;
 
 pub struct Device {
     pub inner: AshDevice,
@@ -39,15 +41,7 @@ impl Device {
                 .collect::<Vec<_>>()
         };
 
-        // TODO clean up
-        let mut device_extensions = extensions.to_owned();
-        if cfg!(target_os = "macos") {
-            // For Mac Support
-            device_extensions.push("VK_KHR_portability_subset".to_owned())
-        }
-
-
-        let device_extensions = device_extensions
+        let device_extensions = extensions
             .iter()
             .map(|e| CString::new(e.to_owned()))
             .collect::<Result<Vec<_>, _>>()?;
@@ -71,12 +65,30 @@ impl Device {
                 .create_device(physical_device.inner, &device_create_info, None)?
         };
 
-        Ok(Self { inner })
+        Ok(Self {
+            inner
+        })
     }
 
-    pub fn get_queue(self: &Arc<Self>, queue_family: QueueFamily, queue_index: u32) -> Queue {
+    pub fn get_queue(
+        self: &Arc<Self>,
+        queue_family: QueueFamily,
+        queue_index: u32,
+
+        #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+        synchronization2: Synchronization2,
+    ) -> Queue {
         let inner = unsafe { self.inner.get_device_queue(queue_family.index, queue_index) };
-        Queue::new(self.clone(), inner)
+
+        Queue::new(
+            inner,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            synchronization2,
+
+            #[cfg(vulkan_1_3)]
+            self.clone(),
+        )
     }
 }
 

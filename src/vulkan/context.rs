@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
-
 use anyhow::{bail, Result};
 use ash::{vk, Entry};
 use ash::vk::{PhysicalDeviceType};
@@ -9,9 +8,11 @@ use gpu_allocator::{
     AllocatorDebugSettings,
 };
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-
 use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig};
-use crate::EngineFeatureValue::{Needed, NotUsed, Wanted};
+use crate::EngineFeatureValue::{Needed, Wanted};
+
+#[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+use ash::extensions::khr::{DynamicRendering, Synchronization2};
 
 pub const DEBUG_GPU_ALLOCATOR: bool = false;
 
@@ -29,6 +30,12 @@ pub struct Context {
     pub instance: Instance,
     pub debug_printing: bool,
     _entry: Entry,
+
+    #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+    pub(crate) synchronization2: Synchronization2,
+
+    #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+    pub(crate) dynamic_rendering: DynamicRendering
 }
 impl Context {
     pub fn new<'a>(
@@ -50,17 +57,29 @@ impl Context {
         // Physical Device
         let mut required_extensions = vec![
             "VK_KHR_swapchain".to_owned(),
-            "VK_KHR_dynamic_rendering".to_owned(),
-            "VK_KHR_synchronization2".to_owned(),
         ];
 
         let mut wanted_extensions = vec![];
 
-        let mut required_device_features = vec![
-            "dynamicRendering".to_owned(),
-            "synchronization2".to_owned()
-        ];
+        let mut required_device_features = vec![];
         let mut wanted_device_features = vec![];
+
+        if cfg!(any(vulkan_1_0, vulkan_1_1, vulkan_1_2)) {
+            required_extensions.append(&mut vec![
+                "VK_KHR_dynamic_rendering".to_owned(),
+                "VK_KHR_synchronization2".to_owned(),
+            ]);
+
+            required_device_features.append(&mut vec![
+                "dynamicRendering".to_owned(),
+                "synchronization2".to_owned()
+            ]);
+        }
+
+        // For Mac Support
+        if cfg!(target_os = "macos") {
+            required_extensions.push("VK_KHR_portability_subset".to_owned())
+        }
 
         let wanted_surface_formats= vec![];
         let wanted_depth_formats = vec![];
@@ -125,8 +144,28 @@ impl Context {
             &required_extensions,
             &required_device_features,
         )?);
-        let graphics_queue = device.get_queue(graphics_queue_family, 0);
-        let present_queue = device.get_queue(present_queue_family, 0);
+
+        #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+        let synchronization2 = Synchronization2::new(&instance.inner, &device.inner);
+
+        #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+        let dynamic_rendering = DynamicRendering::new(&instance.inner, &device.inner);
+
+
+        let graphics_queue = device.get_queue(
+            graphics_queue_family,
+            0,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            synchronization2.to_owned()
+        );
+        let present_queue = device.get_queue(
+            present_queue_family,
+            0,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            synchronization2.to_owned()
+        );
 
         let ray_tracing = required_extensions.contains(&"VK_KHR_ray_tracing_pipeline".to_owned()).then(|| {
             let ray_tracing =
@@ -147,6 +186,12 @@ impl Context {
             ray_tracing.clone(),
             graphics_queue_family,
             Some(vk::CommandPoolCreateFlags::TRANSIENT),
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            synchronization2.to_owned(),
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            dynamic_rendering.to_owned(),
         )?;
 
         // Gpu allocator
@@ -180,6 +225,12 @@ impl Context {
             instance,
             debug_printing,
             _entry: entry,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            synchronization2,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            dynamic_rendering
         })
     }
 }
@@ -317,7 +368,7 @@ impl Context {
     ) -> Result<R> {
         let command_buffer = self
             .command_pool
-            .allocate_command_buffer(vk::CommandBufferLevel::PRIMARY)?;
+            .allocate_command_buffer(vk::CommandBufferLevel::PRIMARY, )?;
 
         // Begin recording
         command_buffer.begin(Some(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT))?;

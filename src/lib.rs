@@ -47,7 +47,6 @@ pub enum EngineFeatureValue {
 pub struct EngineConfig {
     pub name: String,
     pub start_size: UVec2,
-    pub wanted_vulkan_version: Option<Version>,
 
     pub ray_tracing: EngineFeatureValue,
     pub validation_layers: EngineFeatureValue,
@@ -112,6 +111,11 @@ pub trait App: Sized {
 }
 
 pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
+    // Setup cfg aliases
+
+
+
+
     log_init("app_log.log");
 
     let event_loop = EventLoop::new()?;

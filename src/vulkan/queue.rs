@@ -1,9 +1,14 @@
-use std::sync::Arc;
-
 use anyhow::Result;
+use crate::{CommandBuffer, Fence, Semaphore};
 use ash::vk;
 
-use crate::{vulkan::device::Device, CommandBuffer, Fence, Semaphore};
+#[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+use ash::extensions::khr::Synchronization2;
+
+#[cfg(vulkan_1_3)]
+use std::sync::Arc;
+#[cfg(vulkan_1_3)]
+use crate::vulkan::Device;
 
 #[derive(Debug, Clone, Copy)]
 pub struct QueueFamily {
@@ -47,13 +52,34 @@ impl QueueFamily {
 }
 
 pub struct Queue {
-    device: Arc<Device>,
     pub inner: vk::Queue,
+
+    #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+    synchronization2: Synchronization2,
+
+    #[cfg(vulkan_1_3)]
+    device: Arc<Device>,
 }
 
 impl Queue {
-    pub(crate) fn new(device: Arc<Device>, inner: vk::Queue) -> Self {
-        Self { device, inner }
+    pub(crate) fn new(
+        inner: vk::Queue,
+
+        #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+        synchronization2: Synchronization2,
+
+        #[cfg(vulkan_1_3)]
+        device: Arc<Device>
+    ) -> Self {
+        Self {
+            inner,
+
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            synchronization2,
+
+            #[cfg(vulkan_1_3)]
+            device,
+        }
     }
 
     pub fn submit(
@@ -92,6 +118,14 @@ impl Queue {
         };
 
         unsafe {
+            #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
+            self.synchronization2.queue_submit2(
+                self.inner,
+                std::slice::from_ref(&submit_info),
+                fence.inner
+            )?;
+
+            #[cfg(vulkan_1_3)]
             self.device.inner.queue_submit2(
                 self.inner,
                 std::slice::from_ref(&submit_info),
