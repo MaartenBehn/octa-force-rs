@@ -10,14 +10,9 @@ use gpu_allocator::{
 };
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
-use crate::{
-    vulkan::device::{Device},
-    vulkan::instance::Instance,
-    vulkan::physical_device::PhysicalDevice,
-    vulkan::queue::{Queue, QueueFamily},
-    vulkan::surface::Surface,
-    CommandBuffer, CommandPool, RayTracingContext, Version, VERSION_1_0,
-};
+use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, Version, VERSION_1_0, EngineConfig};
+use crate::EngineFeatureValue::{NotUsed, Wanted};
+use crate::vulkan::{VERSION_1_2, VERSION_1_3};
 
 pub const DEBUG_GPU_ALLOCATOR: bool = false;
 
@@ -50,138 +45,53 @@ pub struct ContextBuilder<'a> {
     wanted_device_features: Vec<String>,
 }
 
-impl<'a> ContextBuilder<'a> {
-    pub fn new(
+impl Context {
+    pub fn new<'a>(
         window_handle: &'a dyn HasRawWindowHandle,
         display_handle: &'a dyn HasRawDisplayHandle,
-    ) -> Self {
+        engine_config: &EngineConfig
+    ) -> Result<Self> {
 
-        let required_extensions = vec![
+        // Vulkan instance
+        let entry = Entry::linked();
+        let mut instance = Instance::new(&entry, display_handle, engine_config)?;
+
+        // Vulkan surface
+        let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;
+
+
+        // Physical Device
+        let mut required_extensions = vec![
             "VK_KHR_swapchain".to_owned(),
             "VK_KHR_dynamic_rendering".to_owned()];
-        
+
         let mut wanted_extensions = vec![];
         #[cfg(debug_assertions)]
         wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
 
-        let required_device_features = vec![
+        let mut required_device_features = vec![
             "dynamicRendering".to_owned(),
             "synchronization2".to_owned()
         ];
 
-        Self {
-            window_handle,
-            display_handle,
-            vulkan_version: VERSION_1_0,
-            app_name: "",
-            required_extensions,
-            wanted_extensions,
-            wanted_surface_formats: Vec::new(),
-            wanted_depth_formats: Vec::new(),
-            required_device_features,
-            wanted_device_features: Vec::new(),
+        if engine_config.ray_tracing != NotUsed {
+            required_extensions.append(&mut vec![
+                "VK_KHR_ray_tracing_pipeline".to_owned(),
+                "VK_KHR_acceleration_structure".to_owned(),
+                "VK_KHR_deferred_host_operations".to_owned(),
+            ]);
+
+            required_device_features.append(&mut vec![
+                "rayTracingPipeline".to_owned(),
+                "accelerationStructure".to_owned(),
+                "runtimeDescriptorArray".to_owned(),
+                "bufferDeviceAddress".to_owned(),
+            ]);
         }
-    }
 
-    pub fn vulkan_version(self, vulkan_version: Version) -> Self {
-        Self {
-            vulkan_version,
-            ..self
-        }
-    }
-
-    pub fn app_name(self, app_name: &'a str) -> Self {
-        Self { app_name, ..self }
-    }
-
-    pub fn required_extensions(self, required_extensions: Vec<&str>) -> Self {
-        let mut extensions = self.required_extensions;
-        extensions.extend(required_extensions.into_iter().map(|a| a.to_owned()));
-        extensions.sort_unstable();
-        extensions.dedup();
-
-        Self {
-            required_extensions: extensions,
-            ..self
-        }
-    }
-
-    pub fn wanted_extensions(self, wanted_extensions: Vec<&str>) -> Self {
-        let mut extensions = self.wanted_extensions;
-        extensions.extend(wanted_extensions.into_iter().map(|a| a.to_owned()));
-        extensions.sort_unstable();
-        extensions.dedup();
-
-        Self {
-            wanted_extensions: extensions,
-            ..self
-        }
-    }
-
-    pub fn wanted_surface_formats(self, wanted_surface_formats: Vec<SurfaceFormatKHR>) -> Self {
-        Self {
-            wanted_surface_formats,
-            ..self
-        }
-    }
-
-    pub fn wanted_depth_formats(self, wanted_depth_formats: Vec<Format>) -> Self {
-        Self {
-            wanted_depth_formats,
-            ..self
-        }
-    }
-
-    pub fn required_device_features(self, required_device_features: Vec<&str>) -> Self {
-        let mut features = self.required_device_features;
-        features.extend(required_device_features.into_iter().map(|a| a.to_owned()));
-        features.sort_unstable();
-        features.dedup();
-
-        Self {
-            required_device_features: features,
-            ..self
-        }
-    }
-
-    pub fn wanted_device_features(self, wanted_device_features: Vec<&str>) -> Self {
-        let mut features = self.wanted_device_features;
-        features.extend(wanted_device_features.into_iter().map(|a| a.to_owned()));
-        features.sort_unstable();
-        features.dedup();
-
-        Self {
-            wanted_device_features: features,
-            ..self
-        }
-    }
-
-    pub fn build(self) -> Result<Context> {
-        Context::new(self)
-    }
-}
-
-impl Context {
-    fn new(
-        ContextBuilder {
-            window_handle,
-            display_handle,
-            vulkan_version,
-            app_name,
-            required_extensions,
-            wanted_extensions,
-            wanted_surface_formats,
-            wanted_depth_formats,
-            required_device_features,
-            wanted_device_features
-        }: ContextBuilder,
-    ) -> Result<Self> {
-        // Vulkan instance
-        let entry = Entry::linked();
-        let mut instance = Instance::new(&entry, display_handle, vulkan_version, app_name)?;
-
-        // Vulkan surface
-        let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;
+        let wanted_surface_formats= vec![];
+        let wanted_depth_formats = vec![];
+        let wanted_device_features = vec![];
 
         let physical_devices = instance.enumerate_physical_devices(
             &surface,

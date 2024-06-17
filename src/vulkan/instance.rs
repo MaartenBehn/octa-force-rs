@@ -1,15 +1,19 @@
 use std::ffi::{c_char, c_void, CStr, CString};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use ash::{
     extensions::ext::DebugUtils,
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
+use ash::prelude::VkResult;
 use ash::vk::{Format, SurfaceFormatKHR};
+use log::info;
 use raw_window_handle::HasRawDisplayHandle;
 
-use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, Version};
+use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, Version, EngineConfig};
+use crate::EngineFeatureValue::{Needed, NotUsed};
+use crate::vulkan::{VERSION_1_2, VERSION_1_3};
 
 const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
@@ -20,21 +24,68 @@ pub struct Instance {
     physical_devices: Vec<PhysicalDevice>,
     pub(crate) validation_layers: bool,
     pub(crate) debug_printing: bool,
+    pub(crate) version: Version,
 }
 
 impl Instance {
     pub(crate) fn new(
         entry: &Entry,
         display_handle: &dyn HasRawDisplayHandle,
-        api_version: Version,
-        app_name: &str,
+        engine_config: &EngineConfig,
     ) -> Result<Self> {
-        // Vulkan instance
-        let app_name = CString::new(app_name)?;
 
+
+        // Find supported Vulkan Version
+        let implemented_vulkan_versions = [
+            VERSION_1_2,
+            VERSION_1_3,
+        ];
+
+        let res = entry.try_enumerate_instance_version();
+        if res.is_err() {
+            bail!("No Vulkan Version found. Check if the Vulkan SDK is properly installed.");
+        }
+        let res = res.unwrap();
+        if res.is_none() {
+            bail!("No Vulkan Version found. Check if the Vulkan SDK is properly installed.");
+        }
+
+        let version = res.unwrap();
+        let mut supported_vulkan_versions = vec![];
+        for test_version in implemented_vulkan_versions {
+            if version >= test_version.make_api_version() {
+                supported_vulkan_versions.push(test_version)
+            }
+        }
+
+        if supported_vulkan_versions.is_empty() {
+            bail!("Vulkan Version is not supported by octaforce. The lowest supported Vulkan Version is 1.2. ");
+        }
+
+        let picked_version = if engine_config.wanted_vulkan_version.is_some() {
+            let mut found = true;
+            for test_version in supported_vulkan_versions.iter() {
+                if test_version.make_api_version() == engine_config.wanted_vulkan_version.unwrap().make_api_version() {
+                    found = true;
+                }
+            }
+
+            if found {
+                engine_config.wanted_vulkan_version.unwrap()
+            } else {
+                info!("Wanted Vulkan Version {:?} not supported", engine_config.wanted_vulkan_version.unwrap());
+                supported_vulkan_versions[supported_vulkan_versions.len() - 1]
+            }
+        } else {
+            supported_vulkan_versions[supported_vulkan_versions.len() - 1]
+        };
+        info!("Using Vulkan Version {:?}", picked_version);
+
+        // Vulkan instance
+        let app_name = CString::new(engine_config.name.as_bytes())?;
         let app_info = vk::ApplicationInfo::builder()
             .application_name(app_name.as_c_str())
-            .api_version(api_version.make_api_version());
+            .api_version(picked_version.make_api_version());
 
         let mut extension_names =
             ash_window::enumerate_required_extensions(display_handle.raw_display_handle())?
@@ -45,28 +96,38 @@ impl Instance {
 
         // Validation Layers
         let mut validation_layers = false;
+
         #[cfg(debug_assertions)]
         let (_layer_names, layer_names_ptrs) = get_validation_layer_names_and_pointers();
         #[cfg(debug_assertions)]
-        if check_validation_layer_support(&entry) {
-            extension_names.push(DebugUtils::name().as_ptr());
-            instance_create_info = instance_create_info.enabled_layer_names(&layer_names_ptrs);
-            validation_layers = true;
+        if engine_config.validation_layers != NotUsed {
+            if check_validation_layer_support(&entry) {
+                extension_names.push(DebugUtils::name().as_ptr());
+                instance_create_info = instance_create_info.enabled_layer_names(&layer_names_ptrs);
+                validation_layers = true;
+            } else if engine_config.validation_layers == Needed {
+                bail!("Validation Layers are needed but not supported by hardware.")
+            }
         }
+
 
         // Debug Printing
         let mut debug_printing = false;
         #[cfg(debug_assertions)]
         let mut validation_features = vk::ValidationFeaturesEXT::builder();
         #[cfg(debug_assertions)]
-        if validation_layers {
-            validation_features = validation_features.enabled_validation_features(&[vk::ValidationFeatureEnableEXT::DEBUG_PRINTF]);
-            instance_create_info = instance_create_info.push_next(&mut validation_features);
-            debug_printing = true;
+        if engine_config.shader_debug_printing != NotUsed && validation_layers {
+            if validation_layers {
+                validation_features = validation_features.enabled_validation_features(&[vk::ValidationFeatureEnableEXT::DEBUG_PRINTF]);
+                instance_create_info = instance_create_info.push_next(&mut validation_features);
+                debug_printing = true;
+            } else if engine_config.shader_debug_printing == Needed {
+                bail!("Debug Printing is needed but not supported by hardware.")
+            }
         }
 
+        // For Mac Support
         if cfg!(target_os = "macos") {
-            // For Mac Support
             extension_names.push(vk::KhrPortabilityEnumerationFn::name().as_ptr());
             extension_names.push(vk::KhrGetPhysicalDeviceProperties2Fn::name().as_ptr());
 
@@ -89,7 +150,8 @@ impl Instance {
             debug_report_callback,
             physical_devices: vec![],
             validation_layers,
-            debug_printing
+            debug_printing,
+            version: picked_version
         })
     }
 

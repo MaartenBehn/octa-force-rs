@@ -36,6 +36,28 @@ use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use crate::gui::Gui;
 
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+pub enum EngineFeatureValue {
+    NotUsed,
+    Wanted,
+    Needed,
+}
+
+#[derive(Clone, Debug)]
+pub struct EngineConfig {
+    pub name: String,
+    pub start_size: UVec2,
+    pub wanted_vulkan_version: Option<Version>,
+
+    pub ray_tracing: EngineFeatureValue,
+
+    #[cfg(debug_assertions)]
+    pub validation_layers: EngineFeatureValue,
+    #[cfg(debug_assertions)]
+    pub shader_debug_printing: EngineFeatureValue,
+}
+
+
 pub struct BaseApp<B: App> {
     phantom: PhantomData<B>,
     pub num_frames_in_flight: usize,
@@ -92,13 +114,13 @@ pub trait App: Sized {
     }
 }
 
-pub fn run<A: App + 'static>(app_name: &str, size: UVec2, enable_raytracing: bool) -> Result<()> {
+pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
     log_init("app_log.log");
 
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
     
-    let mut base_app = BaseApp::new(app_name, size, &event_loop, enable_raytracing)?;
+    let mut base_app = BaseApp::new(&event_loop, &engine_config)?;
 
     let mut app = A::new(&mut base_app)?;
 
@@ -209,46 +231,20 @@ pub fn run<A: App + 'static>(app_name: &str, size: UVec2, enable_raytracing: boo
 
 impl<B: App> BaseApp<B> {
     fn new(
-        app_name: &str,
-        size: UVec2,
         event_loop: &EventLoop<()>,
-        enable_raytracing: bool,
+        engine_config: &EngineConfig
     ) -> Result<Self> {
         log::info!("Creating Engine");
 
         let window = WindowBuilder::new()
-            .with_title(app_name)
-            .with_inner_size(PhysicalSize::new(size.x, size.y))
+            .with_title(&engine_config.name)
+            .with_inner_size(PhysicalSize::new(engine_config.start_size.x, engine_config.start_size.y))
             .with_resizable(true)
             .build(&event_loop)
             .unwrap();
 
         // Vulkan context
-        let mut required_extensions = vec![];
-        if enable_raytracing {
-            required_extensions.append(&mut vec![
-                "VK_KHR_ray_tracing_pipeline",
-                "VK_KHR_acceleration_structure",
-                "VK_KHR_deferred_host_operations"
-            ]);
-        }
-
-        let mut required_device_features = vec![];
-        if enable_raytracing {
-            required_device_features.append(&mut vec![
-                "rayTracingPipeline",
-                "accelerationStructure",
-                "runtimeDescriptorArray",
-                "bufferDeviceAddress"
-            ]);
-        }
-
-        let context = ContextBuilder::new(&window, &window)
-            .vulkan_version(VERSION_1_3)
-            .app_name(app_name)
-            .required_extensions(required_extensions)
-            .required_device_features(required_device_features)
-            .build()?;
+        let context = Context::new(&window, &window, engine_config)?;
 
         let command_pool = context.create_command_pool(
             context.graphics_queue_family,
