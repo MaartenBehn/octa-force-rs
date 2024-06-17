@@ -13,7 +13,7 @@ anyhow = "1.0"
 
 fps_clock = "2.0"
 winit = { version = "0.29", default-features = false, features = ["rwh_05", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"]}
-ash = { version = "0.37", features = ["linked"] }
+ash = { version = "0.37" }
 ash-window = "0.12"
 raw-window-handle = "0.5"
 gpu-allocator = { version = "0.25", default-features = false, features = ["vulkan"] }

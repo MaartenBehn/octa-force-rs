@@ -6,16 +6,13 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
-use ash::prelude::VkResult;
 use ash::vk::{Format, SurfaceFormatKHR};
 use log::info;
 use raw_window_handle::HasRawDisplayHandle;
 
 use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, Version, EngineConfig};
 use crate::EngineFeatureValue::{Needed, NotUsed};
-use crate::vulkan::{VERSION_1_2, VERSION_1_3};
-
-const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
+use crate::vulkan::{VERSION_1_0, VERSION_1_1, VERSION_1_2, VERSION_1_3};
 
 #[allow(dead_code)]
 pub struct Instance {
@@ -37,6 +34,8 @@ impl Instance {
 
         // Find supported Vulkan Version
         let implemented_vulkan_versions = [
+            VERSION_1_0,
+            VERSION_1_1,
             VERSION_1_2,
             VERSION_1_3,
         ];
@@ -79,7 +78,7 @@ impl Instance {
         } else {
             supported_vulkan_versions[supported_vulkan_versions.len() - 1]
         };
-        info!("Using Vulkan Version {:?}", picked_version);
+        info!("Using Vulkan Version {}.{}.{}", picked_version.major, picked_version.minor, picked_version.patch);
 
         // Vulkan instance
         let app_name = CString::new(engine_config.name.as_bytes())?;
@@ -96,7 +95,6 @@ impl Instance {
 
         // Validation Layers
         let mut validation_layers = false;
-
         #[cfg(debug_assertions)]
         let (_layer_names, layer_names_ptrs) = get_validation_layer_names_and_pointers();
         #[cfg(debug_assertions)]
@@ -109,7 +107,6 @@ impl Instance {
                 bail!("Validation Layers are needed but not supported by hardware.")
             }
         }
-
 
         // Debug Printing
         let mut debug_printing = false;
@@ -131,9 +128,10 @@ impl Instance {
             extension_names.push(vk::KhrPortabilityEnumerationFn::name().as_ptr());
             extension_names.push(vk::KhrGetPhysicalDeviceProperties2Fn::name().as_ptr());
 
-            instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
             instance_create_info.flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
         }
+
+        instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
 
         // Creating Instance
         let inner = unsafe { entry.create_instance(&instance_create_info, None)? };
@@ -188,6 +186,9 @@ impl Instance {
         Ok(&self.physical_devices)
     }
 }
+
+
+const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
 /// Get the pointers to the validation layers names.
 /// Also return the corresponding `CString` to avoid dangling pointers.

@@ -3,16 +3,15 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Result};
 use ash::{vk, Entry};
-use ash::vk::{Format, PhysicalDeviceType, SurfaceFormatKHR};
+use ash::vk::{PhysicalDeviceType};
 use gpu_allocator::{
     vulkan::{Allocator, AllocatorCreateDesc},
     AllocatorDebugSettings,
 };
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
-use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, Version, VERSION_1_0, EngineConfig};
-use crate::EngineFeatureValue::{NotUsed, Wanted};
-use crate::vulkan::{VERSION_1_2, VERSION_1_3};
+use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig};
+use crate::EngineFeatureValue::{NotUsed};
 
 pub const DEBUG_GPU_ALLOCATOR: bool = false;
 
@@ -31,20 +30,6 @@ pub struct Context {
     pub debug_printing: bool,
     _entry: Entry,
 }
-
-pub struct ContextBuilder<'a> {
-    window_handle: &'a dyn HasRawWindowHandle,
-    display_handle: &'a dyn HasRawDisplayHandle,
-    vulkan_version: Version,
-    app_name: &'a str,
-    required_extensions: Vec<String>,
-    wanted_extensions: Vec<String>,
-    wanted_surface_formats: Vec<SurfaceFormatKHR>,
-    wanted_depth_formats: Vec<Format>,
-    required_device_features: Vec<String>,
-    wanted_device_features: Vec<String>,
-}
-
 impl Context {
     pub fn new<'a>(
         window_handle: &'a dyn HasRawWindowHandle,
@@ -53,7 +38,7 @@ impl Context {
     ) -> Result<Self> {
 
         // Vulkan instance
-        let entry = Entry::linked();
+        let entry = unsafe { Entry::load()? };
         let mut instance = Instance::new(&entry, display_handle, engine_config)?;
 
         // Vulkan surface

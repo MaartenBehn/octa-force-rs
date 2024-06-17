@@ -50,10 +50,7 @@ pub struct EngineConfig {
     pub wanted_vulkan_version: Option<Version>,
 
     pub ray_tracing: EngineFeatureValue,
-
-    #[cfg(debug_assertions)]
     pub validation_layers: EngineFeatureValue,
-    #[cfg(debug_assertions)]
     pub shader_debug_printing: EngineFeatureValue,
 }
 
