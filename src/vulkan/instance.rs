@@ -7,6 +7,7 @@ use ash::{
     Entry, Instance as AshInstance,
 };
 use ash::vk::{Format, SurfaceFormatKHR};
+use log::info;
 use raw_window_handle::HasRawDisplayHandle;
 
 use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, EngineConfig};
@@ -32,6 +33,8 @@ impl Instance {
         #[cfg(vulkan_1_1)] let version = crate::vulkan::Version::VK_1_1;
         #[cfg(vulkan_1_2)] let version = crate::vulkan::Version::VK_1_2;
         #[cfg(vulkan_1_3)] let version = crate::vulkan::Version::VK_1_3;
+
+        info!("Using Vulkan Version {:?}", version);
 
         // Vulkan instance
         let app_name = CString::new(engine_config.name.as_bytes())?;
