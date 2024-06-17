@@ -65,11 +65,14 @@ impl Instance {
             debug_printing = true;
         }
 
-        // For Mac Support
-        extension_names.push(vk::KhrPortabilityEnumerationFn::name().as_ptr());
-        extension_names.push(vk::KhrGetPhysicalDeviceProperties2Fn::name().as_ptr());
+        if cfg!(target_os = "macos") {
+            // For Mac Support
+            extension_names.push(vk::KhrPortabilityEnumerationFn::name().as_ptr());
+            extension_names.push(vk::KhrGetPhysicalDeviceProperties2Fn::name().as_ptr());
 
-        instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
+            instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
+            instance_create_info.flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
+        }
 
         // Creating Instance
         let inner = unsafe { entry.create_instance(&instance_create_info, None)? };
