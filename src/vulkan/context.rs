@@ -45,13 +45,11 @@ impl Context {
     ) -> Result<Self> {
 
         // Vulkan instance
-        let entry = unsafe { Entry::load()? };
+        let entry = Entry::linked();
         let mut instance = Instance::new(&entry, display_handle, engine_config)?;
 
         // Vulkan surface
         let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;
-
-
 
 
         // Physical Device
