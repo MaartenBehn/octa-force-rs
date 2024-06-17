@@ -11,7 +11,7 @@ use gpu_allocator::{
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
 
 use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig};
-use crate::EngineFeatureValue::{NotUsed};
+use crate::EngineFeatureValue::{Needed, NotUsed, Wanted};
 
 pub const DEBUG_GPU_ALLOCATOR: bool = false;
 
@@ -45,21 +45,35 @@ impl Context {
         let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;
 
 
+
+
         // Physical Device
         let mut required_extensions = vec![
             "VK_KHR_swapchain".to_owned(),
-            "VK_KHR_dynamic_rendering".to_owned()];
+            "VK_KHR_dynamic_rendering".to_owned(),
+            "VK_KHR_synchronization2".to_owned(),
+        ];
 
         let mut wanted_extensions = vec![];
-        #[cfg(debug_assertions)]
-        wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
 
         let mut required_device_features = vec![
             "dynamicRendering".to_owned(),
             "synchronization2".to_owned()
         ];
+        let mut wanted_device_features = vec![];
 
-        if engine_config.ray_tracing != NotUsed {
+        let wanted_surface_formats= vec![];
+        let wanted_depth_formats = vec![];
+
+
+        #[cfg(debug_assertions)]
+        if engine_config.shader_debug_printing == Wanted {
+            wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
+        } else if engine_config.shader_debug_printing == Needed {
+            required_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
+        }
+
+        if engine_config.ray_tracing == Wanted {
             required_extensions.append(&mut vec![
                 "VK_KHR_ray_tracing_pipeline".to_owned(),
                 "VK_KHR_acceleration_structure".to_owned(),
@@ -72,11 +86,20 @@ impl Context {
                 "runtimeDescriptorArray".to_owned(),
                 "bufferDeviceAddress".to_owned(),
             ]);
-        }
+        } else if engine_config.ray_tracing == Needed {
+            wanted_extensions.append(&mut vec![
+                "VK_KHR_ray_tracing_pipeline".to_owned(),
+                "VK_KHR_acceleration_structure".to_owned(),
+                "VK_KHR_deferred_host_operations".to_owned(),
+            ]);
 
-        let wanted_surface_formats= vec![];
-        let wanted_depth_formats = vec![];
-        let wanted_device_features = vec![];
+            wanted_device_features.append(&mut vec![
+                "rayTracingPipeline".to_owned(),
+                "accelerationStructure".to_owned(),
+                "runtimeDescriptorArray".to_owned(),
+                "bufferDeviceAddress".to_owned(),
+            ]);
+        }
 
         let physical_devices = instance.enumerate_physical_devices(
             &surface,

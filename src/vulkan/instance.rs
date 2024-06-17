@@ -6,8 +6,9 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
+use ash::extensions::khr::Synchronization2;
 use ash::vk::{Format, SurfaceFormatKHR};
-use log::info;
+use log::{debug, info};
 use raw_window_handle::HasRawDisplayHandle;
 
 use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, Version, EngineConfig};
@@ -130,6 +131,8 @@ impl Instance {
 
             instance_create_info.flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
         }
+
+
 
         instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
 
