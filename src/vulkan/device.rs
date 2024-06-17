@@ -39,10 +39,19 @@ impl Device {
                 .collect::<Vec<_>>()
         };
 
-        let device_extensions = extensions
+        // TODO clean up
+        let mut device_extensions = extensions.to_owned();
+        if cfg!(target_os = "macos") {
+            // For Mac Support
+            device_extensions.push("VK_KHR_portability_subset".to_owned())
+        }
+
+
+        let device_extensions = device_extensions
             .iter()
             .map(|e| CString::new(e.to_owned()))
             .collect::<Result<Vec<_>, _>>()?;
+
         let device_extensions_ptrs = device_extensions
             .iter()
             .map(|e| e.as_ptr())
