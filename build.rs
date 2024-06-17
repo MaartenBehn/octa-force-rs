@@ -5,7 +5,7 @@ fn main() {
 
     let res = entry.try_enumerate_instance_version();
     if res.is_err() {
-        panic!("No Vulkan Version found. Check if the Vulkan SDK is properly installed.");
+        println!("cargo::rustc-cfg=vulkan_1_0");
     }
     let res = res.unwrap();
     if res.is_none() {
