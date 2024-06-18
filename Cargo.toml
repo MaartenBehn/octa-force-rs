@@ -1,6 +1,6 @@
 [package]
 name = "octa-force"
-version = "0.1.12"
+version = "0.1.13"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -22,9 +22,11 @@ egui = "0.26"
 egui_plot = "0.26"
 egui-winit = "0.26"
 egui-ash-renderer = { version = "0.1.0", features = ["gpu-allocator", "dynamic-rendering"]}
-
 egui_extras = { version = "0.26", default-features = false, features = ["all_loaders"] }
 image = { version = "0.24", features = ["jpeg", "png"] }
+
+puffin_http = "0.16.0"
+puffin_egui = "0.26"
 
 [build-dependencies]
 ash = { version = "0.37", features = ["linked"] }

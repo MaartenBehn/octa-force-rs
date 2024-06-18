@@ -5,6 +5,7 @@ pub extern crate egui;
 pub extern crate egui_ash_renderer;
 pub extern crate egui_winit;
 pub extern crate egui_extras;
+pub extern crate puffin_egui;
 
 pub mod camera;
 pub mod controls;
@@ -25,6 +26,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use puffin_egui::puffin;
 use vulkan::*;
 use winit::{
     dpi::PhysicalSize,
@@ -111,11 +113,6 @@ pub trait App: Sized {
 }
 
 pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
-    // Setup cfg aliases
-
-
-
-
     log_init("app_log.log");
 
     let event_loop = EventLoop::new()?;
@@ -151,9 +148,7 @@ pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
                 };
                 last_frame_start = Instant::now();
                 
-                base_app
-                    .frame_stats
-                    .set_frame_time(frame_time, compute_time);
+                base_app.frame_stats.set_cpu_time(frame_time, compute_time);
 
                 base_app.controls.reset();
             }
@@ -266,7 +261,7 @@ impl<B: App> BaseApp<B> {
 
         let controls = Controls::default();
         
-        let frame_stats = FrameStats::default();
+        let frame_stats = FrameStats::new();
         let stats_gui = Gui::new(&context, swapchain.format, swapchain.depth_format,  &window, num_frames)?;
         
 
@@ -302,6 +297,8 @@ impl<B: App> BaseApp<B> {
     }
 
     fn draw(&mut self, base_app: &mut B) -> Result<bool> {
+        puffin::profile_function!();
+
         // Drawing the frame
         self.in_flight_frames.next();
         self.in_flight_frames.fence().wait(None)?;
@@ -312,7 +309,7 @@ impl<B: App> BaseApp<B> {
             .then(|| self.in_flight_frames.gpu_frame_time_ms())
             .transpose()?
             .unwrap_or_default();
-        self.frame_stats.set_gpu_time_time(gpu_time);
+        self.frame_stats.set_gpu_time(gpu_time);
         self.frame_stats.tick();
 
         let next_image_result = self.swapchain.acquire_next_image(
@@ -327,8 +324,11 @@ impl<B: App> BaseApp<B> {
             },
         };
         self.in_flight_frames.fence().reset()?;
-        
-        base_app.update(self, image_index, self.frame_stats.frame_time)?;
+
+        {
+            puffin::profile_scope!("update app");
+            base_app.update(self, image_index, self.frame_stats.frame_time)?;
+        }
 
         self.record_command_buffer(image_index, base_app)?;
 
@@ -364,6 +364,8 @@ impl<B: App> BaseApp<B> {
     }
 
     fn record_command_buffer(&mut self, image_index: usize, base_app: &mut B) -> Result<()> {
+        puffin::profile_function!();
+
         let buffer = &self.command_buffers[image_index];
         buffer.reset()?;
         buffer.begin(None)?;
@@ -374,12 +376,15 @@ impl<B: App> BaseApp<B> {
             0,
         );
 
-        base_app.record_render_commands(self, image_index)?;
-
+        {
+            puffin::profile_scope!("render app");
+            base_app.record_render_commands(self, image_index)?;
+        }
 
         let buffer = &self.command_buffers[image_index];
 
         if self.frame_stats.stats_display_mode != StatsDisplayMode::None {
+            puffin::profile_scope!("render stats");
             buffer.begin_rendering(
                 &self.swapchain.images_and_views[image_index].view,
                 &self.swapchain.depht_images_and_views[image_index].view,

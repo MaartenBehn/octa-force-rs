@@ -1,6 +1,7 @@
 use crate::Queue;
 use std::time::Duration;
 use egui::Align2;
+use puffin_egui::puffin;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StatsDisplayMode {
@@ -38,8 +39,13 @@ pub(crate) struct FrameStats {
     pub(crate) stats_display_mode: StatsDisplayMode,
 }
 
-impl Default for FrameStats {
-    fn default() -> Self {
+impl FrameStats {
+    const ONE_SEC: Duration = Duration::from_secs(1);
+    const MAX_LOG_SIZE: usize = 1000;
+
+    pub fn new() -> Self {
+        puffin::set_scopes_on(true);
+
         Self {
             previous_frame_time: Default::default(),
             frame_time: Default::default(),
@@ -56,11 +62,6 @@ impl Default for FrameStats {
             stats_display_mode: StatsDisplayMode::None,
         }
     }
-}
-
-impl FrameStats {
-    const ONE_SEC: Duration = Duration::from_secs(1);
-    const MAX_LOG_SIZE: usize = 1000;
 
     pub(crate) fn toggle_stats(&mut self) {
         self.stats_display_mode = self.stats_display_mode.next();
@@ -87,7 +88,7 @@ impl FrameStats {
         }
     }
 
-    pub(crate) fn set_frame_time(&mut self, frame_time: Duration, compute_time: Duration) {
+    pub(crate) fn set_cpu_time(&mut self, frame_time: Duration, compute_time: Duration) {
         self.previous_frame_time = self.frame_time;
         self.previous_compute_time = self.compute_time;
 
@@ -95,7 +96,7 @@ impl FrameStats {
         self.compute_time = compute_time;
     }
 
-    pub(crate) fn set_gpu_time_time(&mut self, gpu_time: Duration) {
+    pub(crate) fn set_gpu_time(&mut self, gpu_time: Duration) {
         self.gpu_time = gpu_time;
     }
 
@@ -128,6 +129,9 @@ impl FrameStats {
                 ui.add_space(5.0);
                 build_frametime_plot(ui, "GPU", &self.gpu_time_ms_log.0);
             });
+
+            puffin_egui::profiler_window(ctx);
+            puffin::GlobalProfiler::lock().new_frame();
         }
     }
 }
