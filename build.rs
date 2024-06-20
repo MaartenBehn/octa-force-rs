@@ -14,7 +14,7 @@ fn main() {
 
     let version = res.unwrap();
     let implemented_vulkan_versions = [
-        (ash::vk::make_api_version(0, 1, 3, 0), "vulkan_1_3"),
+        //(ash::vk::make_api_version(0, 1, 3, 0), "vulkan_1_3"),
         (ash::vk::make_api_version(0, 1, 2, 0), "vulkan_1_2"),
         (ash::vk::make_api_version(0, 1, 1, 0), "vulkan_1_1"),
         (ash::vk::make_api_version(0, 1, 0, 0), "vulkan_1_0"),
