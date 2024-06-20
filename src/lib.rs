@@ -13,6 +13,7 @@ pub mod gui;
 pub mod logger;
 mod stats;
 pub mod vulkan;
+pub mod utils;
 
 
 use crate::stats::{FrameStats, StatsDisplayMode};
