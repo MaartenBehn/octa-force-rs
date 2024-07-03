@@ -72,6 +72,18 @@ impl Context {
                 "dynamicRendering".to_owned(),
                 "synchronization2".to_owned()
             ]);
+        } else if cfg!(vulkan_1_3) {
+
+            // The Engine does not use the extensions in vulkan 1.3 but the egui ash renderer dose so we still need to activate them.
+            required_extensions.append(&mut vec![
+                "VK_KHR_dynamic_rendering".to_owned(),
+                "VK_KHR_synchronization2".to_owned(),
+            ]);
+
+            required_device_features.append(&mut vec![
+                "dynamicRendering".to_owned(),
+                "synchronization2".to_owned()
+            ]);
         }
 
         // For Mac Support
@@ -87,6 +99,7 @@ impl Context {
         if engine_config.shader_debug_printing == Wanted {
             wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
         } else if engine_config.shader_debug_printing == Needed {
+            wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
             required_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
         }
 

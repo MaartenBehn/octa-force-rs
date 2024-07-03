@@ -111,23 +111,32 @@ impl FrameStats {
                 .interactable(false)
                 .resizable(false)
                 .drag_to_scroll(false)
+                .fixed_size(&[200.0, 100.0])
                 .show(ctx, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.set_height(ui.available_height());
+
                     ui.label("Framerate");
                     ui.label(format!("{} fps", self.fps_counter));
                     ui.label("Frametimes");
-                    ui.label(format!("all - {:?}", self.frame_time));
-                    ui.label(format!("cpu - {:?}", self.compute_time));
-                    ui.label(format!("gpu - {:?}", self.gpu_time));
+                    ui.label(format!("All - {:?}", self.frame_time));
+                    ui.label(format!("CPU - {:?}", self.compute_time));
+                    ui.label(format!("GPU - {:?}", self.gpu_time));
                 });
         }
 
         if matches!(self.stats_display_mode, StatsDisplayMode::Full) {
             egui::TopBottomPanel::bottom("frametime_graphs").show(ctx, |ui| {
+                ui.add_space(5.0);
+                ui.label("All in ms");
                 build_frametime_plot(ui, "Frames", &self.frame_time_ms_log.0);
                 ui.add_space(5.0);
+                ui.label("CPU in ms");
                 build_frametime_plot(ui, "CPU", &self.compute_time_ms_log.0);
                 ui.add_space(5.0);
+                ui.label("GPU in ms");
                 build_frametime_plot(ui, "GPU", &self.gpu_time_ms_log.0);
+                ui.add_space(5.0);
             });
 
             puffin_egui::profiler_window(ctx);

@@ -1,13 +1,11 @@
 use anyhow::Result;
 use ash::vk::Extent2D;
-use egui::{
-    Context as EguiContext, FullOutput, TextureId,
-    ViewportId,
-};
+use egui::{Context as EguiContext, FullOutput, TextureId, ViewportId};
 use egui_ash_renderer::{DynamicRendering, Options, Renderer};
 use egui_winit::State as EguiWinit;
 use egui_winit::winit::window::Window;
 use glam::UVec2;
+use log::info;
 use crate::vulkan::{ash::vk, CommandBuffer, Context as VkContext, Context};
 use winit::{event::WindowEvent};
 
@@ -25,9 +23,14 @@ impl Gui {
         depth_attachment_format: vk::Format,
         window: &Window,
         in_flight_frames: usize,
+        scale: Option<f32>
     ) -> Result<Self> {
         let egui = EguiContext::default();
-        let platform = EguiWinit::new(egui.clone(), ViewportId::ROOT, &window, None, None);
+        if scale.is_some() {
+            egui.set_pixels_per_point(scale.unwrap());
+        }
+
+        let platform = EguiWinit::new(egui.clone(), ViewportId::ROOT, &window, scale, None);
 
         let gui_renderer = Renderer::with_gpu_allocator(
             context.allocator.clone(),
@@ -64,7 +67,7 @@ impl Gui {
         build: F,
     ) -> Result<()> {
         if !self.gui_textures_to_free[image_index].is_empty() {
-            self.renderer.free_textures(&self.gui_textures_to_free[image_index])?;
+            self.renderer.free_textures(self.gui_textures_to_free[image_index].as_slice())?;
         }
 
         let raw_input =  self.egui_winit.take_egui_input(window);

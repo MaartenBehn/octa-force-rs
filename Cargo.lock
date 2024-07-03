@@ -563,12 +563,12 @@ dependencies = [
 
 [[package]]
 name = "egui-ash-renderer"
-version = "0.3.0"
-source = "git+https://github.com/MaartenBehn/egui-ash-renderer.git#0c5ab932f2af6abd82cd60882b47b141af8f5636"
+version = "0.4.0"
+source = "git+https://github.com/MaartenBehn/egui-ash-renderer.git#a868d8277c4e7ed1ed076d04e68b0f4f429d86f6"
 dependencies = [
  "ash",
  "egui",
- "gpu-allocator",
+ "gpu-allocator 0.25.0",
  "log",
  "thiserror",
 ]
@@ -853,6 +853,18 @@ name = "gpu-allocator"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f56f6318968d03c18e1bcf4857ff88c61157e9da8e47c5f29055d60e1228884"
+dependencies = [
+ "ash",
+ "log",
+ "presser",
+ "thiserror",
+]
+
+[[package]]
+name = "gpu-allocator"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd4240fc91d3433d5e5b0fc5b67672d771850dc19bbee03c1381e19322803d7"
 dependencies = [
  "ash",
  "log",
@@ -1311,7 +1323,7 @@ dependencies = [
  "egui_plot",
  "fps_clock",
  "glam",
- "gpu-allocator",
+ "gpu-allocator 0.26.0",
  "image",
  "log",
  "puffin_egui",
