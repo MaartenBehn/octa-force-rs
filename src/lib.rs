@@ -263,7 +263,7 @@ impl<B: App> BaseApp<B> {
         let controls = Controls::default();
         
         let frame_stats = FrameStats::new();
-        let stats_gui = Gui::new(&context, swapchain.format, swapchain.depth_format,  &window, num_frames, Some(0.5))?;
+        let stats_gui = Gui::new(&context, swapchain.format, swapchain.depth_format,  &window, num_frames)?;
         
 
         Ok(Self {

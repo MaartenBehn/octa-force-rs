@@ -23,14 +23,13 @@ impl Gui {
         depth_attachment_format: vk::Format,
         window: &Window,
         in_flight_frames: usize,
-        scale: Option<f32>
+
     ) -> Result<Self> {
         let egui = EguiContext::default();
-        if scale.is_some() {
-            egui.set_pixels_per_point(scale.unwrap());
-        }
+        let pixels_per_point = 1.0 / window.scale_factor() as f32;
+        egui.set_pixels_per_point(pixels_per_point);
 
-        let platform = EguiWinit::new(egui.clone(), ViewportId::ROOT, &window, scale, None);
+        let platform = EguiWinit::new(egui.clone(), ViewportId::ROOT, &window, Some(pixels_per_point), None);
 
         let gui_renderer = Renderer::with_gpu_allocator(
             context.allocator.clone(),
