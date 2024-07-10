@@ -298,6 +298,7 @@ impl<B: App> BaseApp<B> {
     }
 
     fn draw(&mut self, base_app: &mut B) -> Result<bool> {
+        #[cfg(debug_assertions)]
         puffin::profile_function!();
 
         // Drawing the frame
@@ -327,6 +328,7 @@ impl<B: App> BaseApp<B> {
         self.in_flight_frames.fence().reset()?;
 
         {
+            #[cfg(debug_assertions)]
             puffin::profile_scope!("update app");
             base_app.update(self, image_index, self.frame_stats.frame_time)?;
         }
@@ -365,6 +367,7 @@ impl<B: App> BaseApp<B> {
     }
 
     fn record_command_buffer(&mut self, image_index: usize, base_app: &mut B) -> Result<()> {
+        #[cfg(debug_assertions)]
         puffin::profile_function!();
 
         let buffer = &self.command_buffers[image_index];
@@ -378,14 +381,18 @@ impl<B: App> BaseApp<B> {
         );
 
         {
+            #[cfg(debug_assertions)]
             puffin::profile_scope!("render app");
+
             base_app.record_render_commands(self, image_index)?;
         }
 
         let buffer = &self.command_buffers[image_index];
 
         if self.frame_stats.stats_display_mode != StatsDisplayMode::None {
+            #[cfg(debug_assertions)]
             puffin::profile_scope!("render stats");
+
             buffer.begin_rendering(
                 &self.swapchain.images_and_views[image_index].view,
                 &self.swapchain.depht_images_and_views[image_index].view,

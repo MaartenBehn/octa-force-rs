@@ -5,7 +5,6 @@ use egui_ash_renderer::{DynamicRendering, Options, Renderer};
 use egui_winit::State as EguiWinit;
 use egui_winit::winit::window::Window;
 use glam::UVec2;
-use log::info;
 use crate::vulkan::{ash::vk, CommandBuffer, Context as VkContext, Context};
 use winit::{event::WindowEvent};
 

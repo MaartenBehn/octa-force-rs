@@ -44,6 +44,7 @@ impl FrameStats {
     const MAX_LOG_SIZE: usize = 1000;
 
     pub fn new() -> Self {
+        #[cfg(debug_assertions)]
         puffin::set_scopes_on(true);
 
         Self {
@@ -139,8 +140,11 @@ impl FrameStats {
                 ui.add_space(5.0);
             });
 
-            puffin_egui::profiler_window(ctx);
-            puffin::GlobalProfiler::lock().new_frame();
+            #[cfg(debug_assertions)]
+            {
+                puffin_egui::profiler_window(ctx);
+                puffin::GlobalProfiler::lock().new_frame();
+            }
         }
     }
 }

@@ -97,9 +97,9 @@ impl DescriptorSet {
         use WriteDescriptorSetKind::*;
 
         // these Vec are here to keep structure internal to WriteDescriptorSet (DescriptorImageInfo, DescriptorBufferInfo, ...) alive
-        let mut img_infos = vec![];
-        let mut buffer_infos = vec![];
-        let mut as_infos = vec![];
+        let mut img_infos = Vec::with_capacity(writes.len());
+        let mut buffer_infos = Vec::with_capacity(writes.len());
+        let mut as_infos = Vec::with_capacity(writes.len());
 
         let descriptor_writes = writes
             .iter()
