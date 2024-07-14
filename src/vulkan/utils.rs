@@ -55,9 +55,9 @@ impl Context {
     }
 
     pub fn create_storage_images(
-        &mut self,
+        &self,
         format: vk::Format,
-        extent: vk::Extent2D,
+        res: UVec2,
         count: usize,
     ) -> Result<Vec<ImageAndView>> {
         let mut images = Vec::with_capacity(count);
@@ -67,8 +67,8 @@ impl Context {
                 vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::STORAGE,
                 MemoryLocation::GpuOnly,
                 format,
-                extent.width,
-                extent.height,
+                res.x,
+                res.y,
             )?;
 
             let view = image.create_image_view(false)?;
@@ -92,13 +92,13 @@ impl Context {
     }
 
     pub fn recreate_storage_images(
-        &mut self,
+        &self,
         format: vk::Format,
-        extent: vk::Extent2D,
+        res: UVec2,
         storage_images: &mut Vec<ImageAndView>,
     ) -> Result<()> {
         let new_storage_images =
-            self.create_storage_images(format, extent, storage_images.len())?;
+            self.create_storage_images(format, res, storage_images.len())?;
 
         let _ = std::mem::replace(storage_images, new_storage_images);
 
