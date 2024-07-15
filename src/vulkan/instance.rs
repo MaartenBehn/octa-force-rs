@@ -10,14 +10,14 @@ use ash::vk::{Format, SurfaceFormatKHR};
 use log::info;
 use raw_window_handle::HasRawDisplayHandle;
 
-use crate::{vulkan::physical_device::PhysicalDevice, vulkan::surface::Surface, EngineConfig};
+use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, vulkan::surface::Surface, EngineConfig};
 use crate::EngineFeatureValue::{Needed, NotUsed};
 
 #[allow(dead_code)]
 pub struct Instance {
     pub(crate) inner: AshInstance,
     debug_report_callback: Option<(DebugUtils, DebugUtilsMessengerEXT)>,
-    physical_devices: Vec<PhysicalDevice>,
+    pub(crate) physical_devices_capabilities: Vec<PhysicalDeviceCapabilities>,
     pub(crate) validation_layers: bool,
     pub(crate) debug_printing: bool,
 }
@@ -104,43 +104,10 @@ impl Instance {
         Ok(Self {
             inner,
             debug_report_callback,
-            physical_devices: vec![],
+            physical_devices_capabilities: vec![],
             validation_layers,
             debug_printing,
         })
-    }
-
-    pub(crate) fn enumerate_physical_devices(
-        &mut self,
-        surface: &Surface,
-        required_extensions: &[String],
-        wanted_extensions: &[String],
-        wanted_surface_formats: &[SurfaceFormatKHR],
-        wanted_depth_formats: &[Format],
-        required_device_features: &[String],
-        wanted_device_features: &[String],
-    ) -> Result<&[PhysicalDevice]> {
-        if self.physical_devices.is_empty() {
-            let physical_devices = unsafe { self.inner.enumerate_physical_devices()? };
-
-            let physical_devices = physical_devices
-                .into_iter()
-                .map(|pd| PhysicalDevice::new(
-                    &self.inner,
-                    surface,
-                    pd,
-                    required_extensions,
-                    wanted_extensions,
-                    wanted_surface_formats,
-                    wanted_depth_formats,
-                    required_device_features,
-                    wanted_device_features))
-                .collect::<Result<Vec<_>>>()?;
-
-            self.physical_devices = physical_devices;
-        }
-
-        Ok(&self.physical_devices)
     }
 }
 
@@ -199,7 +166,7 @@ unsafe extern "system" fn vulkan_debug_callback(
     let message = CStr::from_ptr((*p_callback_data).p_message);
     match flag {
         Flag::VERBOSE => log::trace!("{:?} - {:?}", typ, message),
-        Flag::INFO => { log::debug!("{:?} - {:?}", typ, message) },
+        Flag::INFO => { log::trace!("{:?} - {:?}", typ, message) },
         Flag::WARNING => log::warn!("{:?} - {:?}", typ, message),
         _ => log::error!("{:?} - {:?}", typ, message),
     }

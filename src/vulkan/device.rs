@@ -4,10 +4,10 @@ use anyhow::Result;
 use ash::{vk, Device as AshDevice};
 use crate::{
     vulkan::instance::Instance,
-    vulkan::physical_device::PhysicalDevice,
+    vulkan::physical_device::PhysicalDeviceCapabilities,
     vulkan::queue::{Queue, QueueFamily},
 };
-use crate::vulkan::physical_device::PhysicalDeviceFeatures;
+use crate::vulkan::physical_device::{PhysicalDevice, PhysicalDeviceFeatures};
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::extensions::khr::Synchronization2;
@@ -20,12 +20,12 @@ impl Device {
     pub(crate) fn new(
         instance: &Instance,
         physical_device: &PhysicalDevice,
-        queue_families: &[QueueFamily],
         extensions: &Vec<String>,
         device_features: &Vec<String>,
     ) -> Result<Self> {
         let queue_priorities = [1.0f32];
-
+        
+        let  queue_families = [physical_device.graphics_queue_family, physical_device.present_queue_family];
         let queue_create_infos = {
             let mut indices = queue_families.iter().map(|f| f.index).collect::<Vec<_>>();
             indices.dedup();

@@ -8,11 +8,12 @@ use gpu_allocator::{
     AllocatorDebugSettings,
 };
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDevice, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig};
+use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDeviceCapabilities, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig, EngineFeatureValue};
 use crate::EngineFeatureValue::{Needed, Wanted};
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::extensions::khr::{DynamicRendering, Synchronization2};
+use crate::vulkan::physical_device::PhysicalDevice;
 
 pub const DEBUG_GPU_ALLOCATOR: bool = false;
 
@@ -23,8 +24,6 @@ pub struct Context {
     pub graphics_queue: Queue,
     pub present_queue: Queue,
     pub device: Arc<Device>,
-    pub present_queue_family: QueueFamily,
-    pub graphics_queue_family: QueueFamily,
     pub physical_device: PhysicalDevice,
     pub surface: Surface,
     pub instance: Instance,
@@ -91,9 +90,6 @@ impl Context {
             required_extensions.push("VK_KHR_portability_subset".to_owned())
         }
 
-        let wanted_surface_formats= vec![];
-        let wanted_depth_formats = vec![];
-
 
         #[cfg(debug_assertions)]
         if engine_config.shader_debug_printing == Wanted {
@@ -131,27 +127,27 @@ impl Context {
             ]);
         }
 
-        let physical_devices = instance.enumerate_physical_devices(
+        instance.load_possible_physical_devices_capabilities(
             &surface,
             &required_extensions,
             &wanted_extensions,
-            &wanted_surface_formats,
-            &wanted_depth_formats,
             &required_device_features,
             &wanted_device_features,
         )?;
-        let physical_device = select_suitable_physical_device(physical_devices)?;
+        
+        let render_storage_image_format_is_needed = engine_config.ray_tracing == EngineFeatureValue::Needed || engine_config.compute_rendering == EngineFeatureValue::Needed;
+        let surface_formats_with_storage_bit_is_wanted = render_storage_image_format_is_needed || engine_config.ray_tracing == EngineFeatureValue::Wanted || engine_config.compute_rendering == EngineFeatureValue::Wanted;
+        let physical_device = instance.select_suitable_physical_device(
+            render_storage_image_format_is_needed,
+            surface_formats_with_storage_bit_is_wanted,
+        )?;
+        
         let debug_printing = instance.debug_printing && physical_device.wanted_extensions["VK_KHR_shader_non_semantic_info"];
 
-        log::info!("Selected physical device: {:?}", physical_device.name);
-
-        let graphics_queue_family = physical_device.graphics_queue.unwrap();
-        let present_queue_family = physical_device.present_queue.unwrap();
-        let queue_families = [graphics_queue_family, present_queue_family];
+        
         let device = Arc::new(Device::new(
             &instance,
             &physical_device,
-            &queue_families,
             &required_extensions,
             &required_device_features,
         )?);
@@ -164,14 +160,14 @@ impl Context {
 
 
         let graphics_queue = device.get_queue(
-            graphics_queue_family,
+            physical_device.graphics_queue_family,
             0,
 
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
             synchronization2.to_owned()
         );
         let present_queue = device.get_queue(
-            present_queue_family,
+            physical_device.present_queue_family,
             0,
 
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
@@ -195,7 +191,7 @@ impl Context {
         let command_pool = CommandPool::new(
             device.clone(),
             ray_tracing.clone(),
-            graphics_queue_family,
+            physical_device.graphics_queue_family,
             Some(vk::CommandPoolCreateFlags::TRANSIENT),
 
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
@@ -229,8 +225,6 @@ impl Context {
             present_queue,
             graphics_queue,
             device,
-            present_queue_family,
-            graphics_queue_family,
             physical_device,
             surface,
             instance,
@@ -244,126 +238,6 @@ impl Context {
             dynamic_rendering
         })
     }
-}
-
-fn select_suitable_physical_device(
-    devices: &[PhysicalDevice],
-) -> Result<PhysicalDevice> {
-    log::debug!("Choosing Vulkan physical device.");
-
-    let mut seen_names = Vec::new();
-
-    let mut supported_devices: Vec<_> = devices
-        .iter()
-        .filter(|device| {
-            let name = &device.name;
-
-            if seen_names.contains(name){
-                return false;
-            }
-            seen_names.push(name.to_owned());
-            log::debug!("Possible Device: {name}");
-
-            let mut ok = true;
-
-            if device.graphics_queue.is_none() {
-                ok = false;
-                log::debug!(" -- No Graphics Queue");
-            }
-
-            if device.present_queue.is_none() {
-                ok = false;
-                log::debug!(" -- No Present Queue");
-            }
-
-            if device.surface_format.is_none() {
-                ok = false;
-                log::debug!(" -- No Surface Format");
-                for format in device.supported_surface_formats.iter() {
-                    log::debug!(" ---- {format:?} supported.");
-                }
-            }
-
-            if device.present_mode.is_none() {
-                ok = false;
-                log::debug!(" -- No Present Mode");
-                for format in device.supported_present_modes.iter() {
-                    log::debug!(" ---- {format:?} supported.");
-                }
-            }
-
-            if !device.limits_ok {
-                ok = false;
-                log::debug!(" -- Limits not ok");
-            }
-
-            if !device.required_extensions_ok {
-                ok = false;
-                log::debug!(" -- Extensions not ok");
-                for (n, b) in device.required_extensions.iter() {
-                    if !b {
-                        log::debug!(" ---- {n} missing.");
-                    }
-                }
-            }
-
-            if !device.wanted_device_features_ok {
-                log::debug!(" -- Not all wanted Extensions");
-                for (n, b) in device.wanted_extensions.iter() {
-                    if !b {
-                        log::debug!(" ---- {n} missing.");
-                    }
-                }
-            }
-
-            if !device.required_device_features_ok {
-                ok = false;
-                log::debug!(" -- Device Features not ok");
-                for (n, b) in device.required_device_features.iter() {
-                    if !b {
-                        log::debug!(" ---- {n} missing.");
-                    }
-                }
-            }
-
-            if !device.wanted_device_features_ok {
-                ok = false;
-                log::debug!(" -- Not all wanted Device Features");
-                for (n, b) in device.wanted_device_features.iter() {
-                    if !b {
-                        log::debug!(" ---- {n} missing.");
-                    }
-                }
-            }
-
-            if ok {
-                log::debug!(" -- Ok");
-            }
-
-            return ok
-        }).collect();
-
-    if supported_devices.is_empty() {
-        bail!("No suitable Device found.")
-    }
-
-    supported_devices.sort_by(|a, b| {
-        a.limits.max_memory_allocation_count.cmp(&b.limits.max_memory_allocation_count)
-    });
-
-    supported_devices.sort_by(|a, b| {
-        if a.device_type == PhysicalDeviceType::DISCRETE_GPU && b.device_type == PhysicalDeviceType::INTEGRATED_GPU {
-            return Ordering::Greater
-        }
-        if a.device_type == PhysicalDeviceType::INTEGRATED_GPU && b.device_type == PhysicalDeviceType::DISCRETE_GPU {
-            return Ordering::Less
-        }
-        Ordering::Equal
-    });
-
-
-
-    Ok( supported_devices[0].clone())
 }
 
 impl Context {

@@ -1,11 +1,14 @@
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
 
-use anyhow::Result;
-use ash::{vk, Instance};
-use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
+use anyhow::{bail, Result};
+use ash::{vk};
+use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceType, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
+use log::{info};
 
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
+use crate::vulkan::instance::Instance;
 
 #[derive(Debug, Clone)]
 pub struct PhysicalDevice {
@@ -14,11 +17,35 @@ pub struct PhysicalDevice {
     pub device_type: vk::PhysicalDeviceType,
 
     pub limits: vk::PhysicalDeviceLimits,
+
+    pub graphics_queue_family: QueueFamily,
+    pub present_queue_family: QueueFamily,
+
+    pub wanted_extensions: HashMap<String, bool>,
+
+    pub surface_format: SurfaceFormatKHR,
+    pub render_storage_image_format: Format,
+
+    pub depth_format: Format,
+
+    pub present_mode: PresentModeKHR,
+
+    pub wanted_device_features: HashMap<String, bool>,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct PhysicalDeviceCapabilities {
+    pub inner: vk::PhysicalDevice,
+    pub name: String,
+    pub device_type: vk::PhysicalDeviceType,
+
+    pub limits: vk::PhysicalDeviceLimits,
     pub limits_ok: bool,
 
     pub queues: Vec<QueueFamily>,
-    pub graphics_queue: Option<QueueFamily>,
-    pub present_queue: Option<QueueFamily>,
+    pub best_graphics_queue: Option<QueueFamily>,
+    pub best_present_queue: Option<QueueFamily>,
 
     pub required_extensions: HashMap<String, bool>,
     pub required_extensions_ok: bool,
@@ -27,13 +54,12 @@ pub struct PhysicalDevice {
     pub wanted_extensions_ok: bool,
 
     pub supported_surface_formats: Vec<SurfaceFormatKHR>,
-    pub surface_format: Option<SurfaceFormatKHR>,
+    pub supported_surface_formats_with_storage_bit: Vec<SurfaceFormatKHR>,
+    pub render_storage_image_formats: Vec<Format>,
 
     pub supported_depth_formats: Vec<Format>,
-    pub depth_format: Option<Format>,
 
     pub supported_present_modes: Vec<PresentModeKHR>,
-    pub present_mode: Option<PresentModeKHR>,
 
     pub required_device_features: HashMap<String, bool>,
     pub required_device_features_ok: bool,
@@ -42,19 +68,229 @@ pub struct PhysicalDevice {
     pub wanted_device_features_ok: bool,
 }
 
-impl PhysicalDevice {
+
+
+impl Instance {
+    pub(crate) fn select_suitable_physical_device(
+        &mut self,
+        render_storage_image_format_is_needed: bool,
+        surface_formats_with_storage_bit_is_wanted: bool
+    ) -> Result<PhysicalDevice> {
+        let mut seen_names = Vec::new();
+
+        let mut devices_capabilities: Vec<_> = self.physical_devices_capabilities
+            .iter()
+            .filter_map(|device_capabilities| {
+                let name = &device_capabilities.name;
+
+                if seen_names.contains(name){
+                    return None;
+                }
+                seen_names.push(name.to_owned());
+                log::info!("Possible Device: {name}");
+
+                let mut ok = true;
+                let mut minus_points = 0;
+
+                if !device_capabilities.limits_ok {
+                    ok = false;
+                    log::info!(" -- Limits not ok");
+                }
+                
+                if device_capabilities.best_graphics_queue.is_none() {
+                    ok = false;
+                    log::info!(" -- No Graphics Queue");
+                }
+
+                if device_capabilities.best_present_queue.is_none() {
+                    ok = false;
+                    log::info!(" -- No Present Queue");
+                }
+
+                if device_capabilities.supported_surface_formats.is_empty() {
+                    ok = false;
+                    log::info!(" -- No Supported Surface Format");
+                }
+                
+                if device_capabilities.supported_surface_formats_with_storage_bit.is_empty() {
+                    log::info!(" -- No Supported Surface Format with Storage Bit");
+                    if surface_formats_with_storage_bit_is_wanted {
+                        minus_points -= 10;
+                        log::info!(" ---- Wanted => -10 Points");
+                    } else {
+                        log::info!(" ---- Not Wanted");
+                    }
+                    
+                    if render_storage_image_format_is_needed && device_capabilities.render_storage_image_formats.is_empty() {
+                        ok = false;
+                        log::info!(" -- No Supported Render Storage Image Format");
+                    }
+                }
+
+                if device_capabilities.supported_present_modes.is_empty() {
+                    ok = false;
+                    log::info!(" -- No Present Mode");
+                }
+
+                if !device_capabilities.required_extensions_ok {
+                    ok = false;
+                    log::info!(" -- Extensions not ok");
+                    for (n, b) in device_capabilities.required_extensions.iter() {
+                        if !b {
+                            log::info!(" ---- {n} missing.");
+                        }
+                    }
+                }
+
+                if !device_capabilities.wanted_device_features_ok {
+                    log::info!(" -- Not all wanted Extensions");
+                    for (n, b) in device_capabilities.wanted_extensions.iter() {
+                        if !b {
+                            minus_points -= 5;
+                            log::info!(" ---- {n} missing => -5 Points");
+                        }
+                    }
+                }
+
+                if !device_capabilities.required_device_features_ok {
+                    ok = false;
+                    log::info!(" -- Device Features not ok");
+                    for (n, b) in device_capabilities.required_device_features.iter() {
+                        if !b {
+                            log::info!(" ---- {n} missing.");
+                        }
+                    }
+                }
+
+                if !device_capabilities.wanted_device_features_ok {
+                    ok = false;
+                    log::info!(" -- Not all wanted Device Features");
+                    for (n, b) in device_capabilities.wanted_device_features.iter() {
+                        if !b {
+                            minus_points -= 5;
+                            log::info!(" ---- {n} missing => -5 Points");
+                        }
+                    }
+                }
+
+                if ok {
+                    log::info!(" -- Ok");
+                    return Some((device_capabilities, minus_points));
+                }
+
+                None
+            }).collect();
+        
+        if devices_capabilities.is_empty() {
+            bail!("No suitable Device found!")
+        }
+        
+        devices_capabilities.sort_by(|(c1, minus_points1), (c2, minus_points2)| {
+            minus_points1.cmp(minus_points2).then(c1.limits.max_memory_allocation_count.cmp(&c2.limits.max_memory_allocation_count))
+        });
+
+        log::info!("Sorted suitable Devices: ");
+        for (c, _) in devices_capabilities.iter() {
+            log::info!(" -- {}", c.name);
+        }
+        
+        let selected_device_capabilities = devices_capabilities[0].0;
+        log::info!("Selected Physical Device: {}", selected_device_capabilities.name);
+        
+        let device_type = selected_device_capabilities.device_type;
+        log::info!(" -- Device Type: {device_type:?}");
+        
+        let (surface_format, surface_format_storage_image_support) = if !selected_device_capabilities.supported_surface_formats_with_storage_bit.is_empty() {
+            (selected_device_capabilities.supported_surface_formats_with_storage_bit[0], true)
+        } else {
+            (selected_device_capabilities.supported_surface_formats[0], false)
+        };
+        log::info!(" -- Surface format: {:?}  {:?}", surface_format.format, surface_format.color_space);
+        log::info!(" ---- {} storage image support", if surface_format_storage_image_support {"✔"} else {"❌"});
+
+        let render_storage_image_format = if surface_format_storage_image_support {
+            selected_device_capabilities.supported_surface_formats_with_storage_bit[0].format
+        } else {
+            selected_device_capabilities.render_storage_image_formats[0]
+        };
+        log::info!(" -- Render storage image format: {:?}", render_storage_image_format);
+
+        let depth_format = selected_device_capabilities.supported_depth_formats[0];
+        log::info!(" -- Depth format: {:?} ", depth_format);
+        
+        let present_mode = selected_device_capabilities.supported_present_modes[0];
+        log::info!(" -- Present Mode: {:?} ", present_mode);
+
+        let wanted_extensions = selected_device_capabilities.wanted_extensions.to_owned();
+        log::info!(" -- Wanted Extensions:");
+        for (name, ok) in wanted_extensions.iter() {
+            log::info!(" ---- {} {name}", if *ok {"✔"} else {"❌"});
+        }
+
+        let wanted_device_features = selected_device_capabilities.wanted_device_features.to_owned();
+        log::info!(" -- Wanted Device Features:");
+        for (name, ok) in wanted_device_features.iter() {
+            log::info!(" ---- {} {name}", if *ok {"✔"} else {"❌"});
+        }
+        
+        Ok(PhysicalDevice {
+            inner: selected_device_capabilities.inner,
+            name: selected_device_capabilities.name.to_owned(),
+            device_type,
+            limits: selected_device_capabilities.limits,
+            graphics_queue_family: selected_device_capabilities.best_graphics_queue.unwrap(),
+            present_queue_family: selected_device_capabilities.best_present_queue.unwrap(),
+            wanted_extensions,
+            surface_format,
+            render_storage_image_format,
+            depth_format,
+            present_mode,
+            wanted_device_features,
+        })
+    }
+
+    pub(crate)  fn load_possible_physical_devices_capabilities(
+        &mut self,
+        surface: &Surface,
+        required_extensions: &[String],
+        wanted_extensions: &[String],
+        required_device_features: &[String],
+        wanted_device_features: &[String]
+    ) -> Result<()> {
+        if !self.physical_devices_capabilities.is_empty() {
+            return Ok(())
+        }
+
+        let physical_devices = unsafe { self.inner.enumerate_physical_devices()? };
+
+        self.physical_devices_capabilities = physical_devices
+            .into_iter()
+            .map(|pd| PhysicalDeviceCapabilities::new(
+                &self,
+                surface,
+                pd,
+                required_extensions,
+                wanted_extensions,
+                required_device_features,
+                wanted_device_features))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(())
+    }
+}
+
+
+impl PhysicalDeviceCapabilities {
     pub(crate) fn new(
         instance: &Instance,
         surface: &Surface,
         inner: vk::PhysicalDevice,
         required_extensions: &[String],
         wanted_extensions: &[String],
-        wanted_surface_formats: &[SurfaceFormatKHR],
-        wanted_depth_formats: &[Format],
         required_device_features: &[String],
         wanted_device_features: &[String],
     ) -> Result<Self> {
-        let props = unsafe { instance.get_physical_device_properties(inner) };
+        let props = unsafe { instance.inner.get_physical_device_properties(inner) };
 
         // Name
         let name = unsafe {
@@ -63,7 +299,6 @@ impl PhysicalDevice {
                 .unwrap()
                 .to_owned()
         };
-
         // Type
         let device_type = props.device_type;
 
@@ -73,7 +308,7 @@ impl PhysicalDevice {
 
         // Queues
         let queue_family_properties =
-            unsafe { instance.get_physical_device_queue_family_properties(inner) };
+            unsafe { instance.inner.get_physical_device_queue_family_properties(inner) };
         let queue_families: Vec<_> = queue_family_properties
             .into_iter()
             .enumerate()
@@ -115,7 +350,7 @@ impl PhysicalDevice {
 
         // Extensions
         let extension_properties =
-            unsafe { instance.enumerate_device_extension_properties(inner)? };
+            unsafe { instance.inner.enumerate_device_extension_properties(inner)? };
         let supported_extensions: Vec<_> = extension_properties
             .into_iter()
             .map(|p| {
@@ -137,29 +372,38 @@ impl PhysicalDevice {
             wanted_extensions_ok &= found;
             (name.to_owned(), found)
         }).collect();
-
-
+        
         // Surface Formats
-        let supported_surface_formats = unsafe {
+        let surface_formats = unsafe {
             surface
                 .inner
                 .get_physical_device_surface_formats(inner, surface.surface_khr)?
         };
 
-        // Choose Surface Format
-        let surface_format = wanted_surface_formats.iter().find(|wanted_format| {
-            supported_surface_formats.iter().find(|format| {
-                format.format == wanted_format.format && format.color_space == wanted_format.color_space
-                // Base: B8G8R8A8_UNORM SRGB_NONLINEAR
-            }).is_some()
-        });
-        let surface_format = if surface_format.is_some() {
-            Some(surface_format.unwrap().to_owned())
-        } else if !supported_surface_formats.is_empty() {
-            Some(supported_surface_formats[0])
-        } else { None };
+        let surface_formats_with_storage_bit: Vec<_> = surface_formats.to_owned().into_iter().filter(|format| {
+            unsafe {
+                let property = instance.inner.get_physical_device_format_properties(inner, format.format);
+                property.optimal_tiling_features.contains(FormatFeatureFlags::STORAGE_IMAGE)
+            }
+        }).collect();
 
-
+        // See https://stackoverflow.com/questions/75094730/why-prefer-non-srgb-format-for-vulkan-swapchain
+        let rgba_formats = [
+            Format::R8G8B8A8_SRGB,
+            Format::R8G8B8A8_UNORM,
+            Format::R8G8B8A8_SINT,
+            Format::R8G8B8A8_SNORM,
+            Format::R8G8B8A8_SSCALED,
+            Format::R8G8B8A8_UINT,
+        ];
+        
+        let render_storage_image_formats: Vec<_> = rgba_formats.into_iter().filter(|format| {
+            unsafe {
+                let property = instance.inner.get_physical_device_format_properties(inner, *format);
+                property.optimal_tiling_features.contains(FormatFeatureFlags::STORAGE_IMAGE)
+            }
+        }).collect();
+        
         // Depth Formats
         let all_depth_formats = [
             Format::D32_SFLOAT,
@@ -171,22 +415,11 @@ impl PhysicalDevice {
 
         let supported_depth_formats = all_depth_formats.into_iter().filter(|format| {
             unsafe {
-                let property = instance.get_physical_device_format_properties(inner, *format);
+                let property = instance.inner.get_physical_device_format_properties(inner, *format);
                 property.optimal_tiling_features.contains(FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT)
             }
         }).collect::<Vec<_>>();
 
-        // Choose Depth Format
-        let depth_format = wanted_depth_formats.iter().find(|wanted_format| {
-            supported_depth_formats.iter().find(|format| {
-                format == wanted_format
-            }).is_some()
-        });
-        let depth_format = if depth_format.is_some() {
-            Some(depth_format.unwrap().to_owned())
-        } else if !supported_depth_formats.is_empty() {
-            Some(supported_depth_formats[0])
-        } else { None };
 
         // Present Mode
         let supported_present_modes = unsafe {
@@ -215,13 +448,12 @@ impl PhysicalDevice {
 
         // Device Features
         let mut required_features = PhysicalDeviceFeatures::new(required_device_features);
-        unsafe { instance.get_physical_device_features2(inner, &mut required_features.vulkan_features()) };
+        unsafe { instance.inner.get_physical_device_features2(inner, &mut required_features.vulkan_features()) };
         let (required_device_features_ok, required_device_features) = required_features.result(required_device_features);
 
         let mut wanted_features = PhysicalDeviceFeatures::new(wanted_device_features);
-        unsafe { instance.get_physical_device_features2(inner, &mut wanted_features.vulkan_features()) };
+        unsafe { instance.inner.get_physical_device_features2(inner, &mut wanted_features.vulkan_features()) };
         let (wanted_device_features_ok, wanted_device_features) = wanted_features.result(wanted_device_features);
-
 
         Ok(Self {
             inner,
@@ -232,8 +464,8 @@ impl PhysicalDevice {
             limits_ok,
 
             queues: queue_families,
-            graphics_queue: graphics,
-            present_queue: present,
+            best_graphics_queue: graphics,
+            best_present_queue: present,
 
             required_extensions,
             required_extensions_ok,
@@ -241,14 +473,12 @@ impl PhysicalDevice {
             wanted_extensions,
             wanted_extensions_ok,
 
-            supported_surface_formats,
-            surface_format,
-
+            supported_surface_formats: surface_formats,
+            supported_surface_formats_with_storage_bit: surface_formats_with_storage_bit,
+            render_storage_image_formats,
             supported_depth_formats,
-            depth_format,
 
             supported_present_modes,
-            present_mode,
 
             required_device_features,
             required_device_features_ok,

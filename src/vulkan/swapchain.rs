@@ -30,7 +30,7 @@ pub struct Swapchain {
 
 impl Swapchain {
     pub fn new(context: &Context, width: u32, height: u32) -> Result<Self> {
-        log::debug!("Creating vulkan swapchain");
+        log::trace!("Creating vulkan swapchain");
 
         let device = context.device.clone();
 
@@ -56,26 +56,22 @@ impl Swapchain {
                 vk::Extent2D { width, height }
             }
         };
-        log::debug!("Swapchain size: {}x{}", extent.width, extent.height);
+        log::info!("Swapchain size: {}x{}", extent.width, extent.height);
 
         // Swapchain image count
         let image_count = capabilities.min_image_count + 1;
-        log::debug!("Swapchain image count: {image_count:?}");
+        log::info!("Swapchain image count: {image_count:?}");
 
         // Swapchain
         let families_indices = [
-            context.graphics_queue_family.index,
-            context.present_queue_family.index,
+            context.physical_device.graphics_queue_family.index,
+            context.physical_device.present_queue_family.index,
         ];
 
-        let format = context.physical_device.surface_format.unwrap();
-        let depth_format = context.physical_device.depth_format.unwrap();
-        let present_mode = context.physical_device.present_mode.unwrap();
-
-        debug!("Swapchain present mode: {:?}", context.physical_device.present_mode.unwrap());
-        log::debug!("Swapchain format: {:?}", format.format);
-        log::debug!("Swapchain depth format: {:?}", depth_format);
-
+        let format = context.physical_device.surface_format;
+        let depth_format = context.physical_device.depth_format;
+        let present_mode = context.physical_device.present_mode;
+        
         let create_info = {
             let mut builder = vk::SwapchainCreateInfoKHR::builder()
                 .surface(context.surface.surface_khr)
@@ -88,7 +84,7 @@ impl Swapchain {
                     vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
                 );
 
-            builder = if context.graphics_queue_family.index != context.present_queue_family.index {
+            builder = if context.physical_device.graphics_queue_family.index != context.physical_device.present_queue_family.index {
                 builder
                     .image_sharing_mode(vk::SharingMode::CONCURRENT)
                     .queue_family_indices(&families_indices)
@@ -99,7 +95,7 @@ impl Swapchain {
             builder
                 .pre_transform(capabilities.current_transform)
                 .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-                .present_mode(context.physical_device.present_mode.unwrap())
+                .present_mode(context.physical_device.present_mode)
                 .clipped(true)
         };
 
@@ -153,7 +149,7 @@ impl Swapchain {
     }
 
     pub fn resize(&mut self, context: &Context, width: u32, height: u32) -> Result<()> {
-        log::debug!("Resizing vulkan swapchain to {width}x{height}");
+        log::info!("Resizing vulkan swapchain to {width}x{height}");
 
         self.destroy();
 
@@ -179,15 +175,14 @@ impl Swapchain {
                 vk::Extent2D { width, height }
             }
         };
-        log::debug!("Swapchain extent: {extent:?}");
 
         // Swapchain image count
         let image_count = capabilities.min_image_count;
 
         // Swapchain
         let families_indices = [
-            context.graphics_queue_family.index,
-            context.present_queue_family.index,
+            context.physical_device.graphics_queue_family.index,
+            context.physical_device.present_queue_family.index,
         ];
 
         let create_info = {
@@ -202,7 +197,7 @@ impl Swapchain {
                     vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
                 );
 
-            builder = if context.graphics_queue_family.index != context.present_queue_family.index {
+            builder = if context.physical_device.graphics_queue_family.index != context.physical_device.present_queue_family.index {
                 builder
                     .image_sharing_mode(vk::SharingMode::CONCURRENT)
                     .queue_family_indices(&families_indices)

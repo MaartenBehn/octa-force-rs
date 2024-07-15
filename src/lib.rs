@@ -52,6 +52,7 @@ pub struct EngineConfig {
     pub start_size: UVec2,
 
     pub ray_tracing: EngineFeatureValue,
+    pub compute_rendering: EngineFeatureValue,
     pub validation_layers: EngineFeatureValue,
     pub shader_debug_printing: EngineFeatureValue,
 }
@@ -244,7 +245,7 @@ impl<B: App> BaseApp<B> {
         let context = Context::new(&window, &window, engine_config)?;
 
         let command_pool = context.create_command_pool(
-            context.graphics_queue_family,
+            context.physical_device.graphics_queue_family,
             Some(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER),
         )?;
 
