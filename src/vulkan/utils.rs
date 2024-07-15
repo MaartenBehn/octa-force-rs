@@ -56,7 +56,6 @@ impl Context {
 
     pub fn create_storage_images(
         &self,
-        format: vk::Format,
         res: UVec2,
         count: usize,
     ) -> Result<Vec<ImageAndView>> {
@@ -66,7 +65,7 @@ impl Context {
             let image = self.create_image(
                 vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::STORAGE,
                 MemoryLocation::GpuOnly,
-                format,
+                self.physical_device.render_storage_image_format,
                 res.x,
                 res.y,
             )?;
