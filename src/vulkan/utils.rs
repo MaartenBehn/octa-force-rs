@@ -92,12 +92,11 @@ impl Context {
 
     pub fn recreate_storage_images(
         &self,
-        format: vk::Format,
         res: UVec2,
         storage_images: &mut Vec<ImageAndView>,
     ) -> Result<()> {
         let new_storage_images =
-            self.create_storage_images(format, res, storage_images.len())?;
+            self.create_storage_images(res, storage_images.len())?;
 
         let _ = std::mem::replace(storage_images, new_storage_images);
 
