@@ -14,10 +14,9 @@ pub mod logger;
 mod stats;
 pub mod vulkan;
 pub mod utils;
-
+pub mod hot_reload;
 
 use crate::stats::{FrameStats, StatsDisplayMode};
-use anyhow::Result;
 use ash::vk::{self};
 use controls::Controls;
 use glam::UVec2;
@@ -39,6 +38,8 @@ use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
 use crate::gui::Gui;
 
+pub type OctaResult<V> = anyhow::Result<V>;
+
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub enum EngineFeatureValue {
     NotUsed,
@@ -58,8 +59,7 @@ pub struct EngineConfig {
 }
 
 
-pub struct BaseApp<B: App> {
-    phantom: PhantomData<B>,
+pub struct Engine {
     pub num_frames_in_flight: usize,
     pub num_frames: usize,
 
@@ -76,53 +76,60 @@ pub struct BaseApp<B: App> {
     pub context: Context,
 }
 
-pub trait App: Sized {
-    fn new(base: &mut BaseApp<Self>) -> Result<Self>;
+pub trait State: Sized {
+    fn new(engine: &mut Engine) -> OctaResult<Self>;
     
     fn update(
         &mut self,
-        base: &mut BaseApp<Self>,
+        engine: &mut Engine,
         image_index: usize,
         delta_time: Duration,
-    ) -> Result<()>;
+    ) -> OctaResult<()>{
+        // prevents reports of unused parameters without needing to use #[allow]
+        let _ = engine;
+        let _ = image_index;
+        let _ = delta_time;
+        
+        Ok(())
+    }
 
     fn record_render_commands(
         &mut self,
-        base: &mut BaseApp<Self>,
+        engine: &mut Engine,
         image_index: usize,
-    ) -> Result<()> {
+    ) -> OctaResult<()> {
         // prevents reports of unused parameters without needing to use #[allow]
-        let _ = base;
+        let _ = engine;
         let _ = image_index;
 
         Ok(())
     }
     
-    fn on_window_event(&mut self, base: &mut BaseApp<Self>, event: &WindowEvent) -> Result<()> {
+    fn on_window_event(&mut self, engine: &mut Engine, event: &WindowEvent) -> OctaResult<()> {
         // prevents reports of unused parameters without needing to use #[allow]
-        let _ = base;
+        let _ = engine;
         let _ = event;
 
         Ok(())
     }
 
-    fn on_recreate_swapchain(&mut self, base: &mut BaseApp<Self>) -> Result<()> {
+    fn on_recreate_swapchain(&mut self, engine: &mut Engine) -> OctaResult<()> {
         // prevents reports of unused parameters without needing to use #[allow]
-        let _ = base;
+        let _ = engine;
 
         Ok(())
     }
 }
 
-pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
+pub fn run<A: State + 'static>(engine_config: EngineConfig) -> OctaResult<()> {
     log_init("app_log.log");
 
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
     
-    let mut base_app = BaseApp::new(&event_loop, &engine_config)?;
+    let mut engine = Engine::new(&event_loop, &engine_config)?;
 
-    let mut app = A::new(&mut base_app)?;
+    let mut state = A::new(&mut engine)?;
 
     let mut is_swapchain_dirty = false;
 
@@ -132,11 +139,10 @@ pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
     let fps_as_duration = Duration::from_secs_f64(1.0 / 60.0);
 
     event_loop.run(move |event, elwt| {
-        
-        let app = &mut app; // Make sure it is dropped before base_app
+        let state = &mut state; // Make sure it is dropped before engine
         
         // Send Event to Controls Struct
-        base_app.controls.handle_event(&event);
+        engine.controls.handle_event(&event);
         
         match event {
             Event::NewEvents(_) => {
@@ -150,14 +156,14 @@ pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
                 };
                 last_frame_start = Instant::now();
                 
-                base_app.frame_stats.set_cpu_time(frame_time, compute_time);
+                engine.frame_stats.set_cpu_time(frame_time, compute_time);
 
-                base_app.controls.reset();
+                engine.controls.reset();
             }
             
             Event::WindowEvent { event, .. } => {
-                base_app.stats_gui.handle_event(&base_app.window, &event);
-                app.on_window_event(&mut base_app, &event)
+                engine.stats_gui.handle_event(&engine.window, &event);
+                state.on_window_event(&mut engine, &event)
                     .expect("Failed in On Window Event");
 
                 match event {
@@ -179,16 +185,16 @@ pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
                         if matches!(physical_key, PhysicalKey::Code(KeyCode::F1))
                             && state == ElementState::Pressed
                         {
-                            base_app.frame_stats.toggle_stats();
+                            engine.frame_stats.toggle_stats();
                         }
                     }
                     // Mouse
                     WindowEvent::MouseInput { state, button, .. } => {
                         if button == MouseButton::Right {
                             if state == ElementState::Pressed {
-                                base_app.window.set_cursor_visible(false);
+                                engine.window.set_cursor_visible(false);
                             } else {
-                                base_app.window.set_cursor_visible(true);
+                                engine.window.set_cursor_visible(true);
                             }
                         }
                     }
@@ -201,23 +207,23 @@ pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
             // Draw
             Event::AboutToWait => {
                 if is_swapchain_dirty {
-                    let dim = base_app.window.inner_size();
+                    let dim = engine.window.inner_size();
                     if dim.width > 0 && dim.height > 0 {
-                        base_app
+                        engine
                             .recreate_swapchain(dim.width, dim.height)
                             .expect("Failed to recreate swapchain");
-                        app.on_recreate_swapchain(&mut base_app)
+                        state.on_recreate_swapchain(&mut engine)
                             .expect("Error on recreate swapchain callback");
                     } else {
                         return;
                     }
                 }
 
-                is_swapchain_dirty = base_app.draw(app).expect("Failed to tick");
+                is_swapchain_dirty = engine.draw(state).expect("Failed to tick");
             }
             
             // Wait for gpu to finish pending work before closing app
-            Event::LoopExiting => base_app
+            Event::LoopExiting => engine
                 .wait_for_gpu()
                 .expect("Failed to wait for gpu to finish work"),
             _ => (),
@@ -227,11 +233,11 @@ pub fn run<A: App + 'static>(engine_config: EngineConfig) -> Result<()> {
     Ok(())
 }
 
-impl<B: App> BaseApp<B> {
+impl Engine {
     fn new(
         event_loop: &EventLoop<()>,
         engine_config: &EngineConfig
-    ) -> Result<Self> {
+    ) -> OctaResult<Self> {
         log::info!("Creating Engine");
 
         let window = WindowBuilder::new()
@@ -268,7 +274,6 @@ impl<B: App> BaseApp<B> {
         
 
         Ok(Self {
-            phantom: PhantomData,
             num_frames_in_flight,
             num_frames,
             window,
@@ -283,7 +288,7 @@ impl<B: App> BaseApp<B> {
         })
     }
 
-    fn recreate_swapchain(&mut self, width: u32, height: u32) -> Result<()> {
+    fn recreate_swapchain(&mut self, width: u32, height: u32) -> OctaResult<()> {
         log::debug!("Recreating the swapchain");
 
         self.wait_for_gpu()?;
@@ -294,11 +299,11 @@ impl<B: App> BaseApp<B> {
         Ok(())
     }
 
-    pub fn wait_for_gpu(&self) -> Result<()> {
+    pub fn wait_for_gpu(&self) -> OctaResult<()> {
         self.context.device_wait_idle()
     }
 
-    fn draw(&mut self, base_app: &mut B) -> Result<bool> {
+    fn draw<S: State>(&mut self, state: &mut S) -> OctaResult<bool> {
         #[cfg(debug_assertions)]
         puffin::profile_function!();
 
@@ -331,10 +336,10 @@ impl<B: App> BaseApp<B> {
         {
             #[cfg(debug_assertions)]
             puffin::profile_scope!("update app");
-            base_app.update(self, image_index, self.frame_stats.frame_time)?;
+            state.update(self, image_index, self.frame_stats.frame_time)?;
         }
 
-        self.record_command_buffer(image_index, base_app)?;
+        self.record_command_buffer(image_index, state)?;
 
         self.context.graphics_queue.submit(
             &self.command_buffers[image_index],
@@ -367,7 +372,7 @@ impl<B: App> BaseApp<B> {
         Ok(false)
     }
 
-    fn record_command_buffer(&mut self, image_index: usize, base_app: &mut B) -> Result<()> {
+    fn record_command_buffer<S: State>(&mut self, image_index: usize, state: &mut S) -> OctaResult<()> {
         #[cfg(debug_assertions)]
         puffin::profile_function!();
 
@@ -385,7 +390,7 @@ impl<B: App> BaseApp<B> {
             #[cfg(debug_assertions)]
             puffin::profile_scope!("render app");
 
-            base_app.record_render_commands(self, image_index)?;
+            state.record_render_commands(self, image_index)?;
         }
 
         let buffer = &self.command_buffers[image_index];
@@ -428,7 +433,7 @@ impl<B: App> BaseApp<B> {
     }
 }
 
-fn create_command_buffers(pool: &CommandPool, swapchain: &Swapchain) -> Result<Vec<CommandBuffer>> {
+fn create_command_buffers(pool: &CommandPool, swapchain: &Swapchain) -> OctaResult<Vec<CommandBuffer>> {
     pool.allocate_command_buffers(vk::CommandBufferLevel::PRIMARY, swapchain.images_and_views.len() as _)
 }
 
@@ -450,7 +455,7 @@ struct PerFrame {
 }
 
 impl InFlightFrames {
-    fn new(context: &Context, frame_count: usize) -> Result<Self> {
+    fn new(context: &Context, frame_count: usize) -> OctaResult<Self> {
         let sync_objects = (0..frame_count)
             .map(|_i| {
                 let image_available_semaphore = context.create_semaphore()?;
@@ -466,7 +471,7 @@ impl InFlightFrames {
                     timing_query_pool,
                 })
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<OctaResult<Vec<_>>>()?;
 
         Ok(Self {
             per_frames: sync_objects,
@@ -494,7 +499,7 @@ impl InFlightFrames {
         &self.per_frames[self.current_frame].timing_query_pool
     }
 
-    fn gpu_frame_time_ms(&self) -> Result<Duration> {
+    fn gpu_frame_time_ms(&self) -> OctaResult<Duration> {
         let result = self.timing_query_pool().wait_for_all_results()?;
         let time = Duration::from_nanos(result[1].saturating_sub(result[0]));
 

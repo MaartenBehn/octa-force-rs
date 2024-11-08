@@ -1,6 +1,6 @@
 [package]
 name = "octa-force"
-version = "0.1.17"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -29,6 +29,7 @@ egui_extras = { version = "0.28", default-features = false, features = ["all_loa
 image = { version = "0.24", features = ["jpeg", "png"] }
 
 puffin_egui = "0.29"
+serde_json = "1.0.132"
 
 [build-dependencies]
 ash = { version = "0.37", features = ["linked"] }

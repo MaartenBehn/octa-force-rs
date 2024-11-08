@@ -1,7 +1,7 @@
 use winit::window::Fullscreen;
-use crate::{App, BaseApp};
+use crate::{State, Engine};
 
-impl<B: App> BaseApp<B> {
+impl Engine {
     pub fn set_fullscreen(&self, value: bool) {
         let fullscreen = if value {
             Some(Fullscreen::Borderless(None))
