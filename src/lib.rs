@@ -14,18 +14,16 @@ pub mod logger;
 mod stats;
 pub mod vulkan;
 pub mod utils;
-pub mod hot_reload;
+pub mod hot_reloading;
+pub mod binding;
 
 use crate::stats::{FrameStats, StatsDisplayMode};
 use ash::vk::{self};
 use controls::Controls;
 use glam::UVec2;
 use logger::log_init;
-use std::{
-    marker::PhantomData,
-    thread,
-    time::{Duration, Instant},
-};
+use std::{mem, thread, time::{Duration, Instant}};
+use log::debug;
 use puffin_egui::puffin;
 use vulkan::*;
 use winit::{
@@ -36,6 +34,8 @@ use winit::{
 };
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
+use crate::binding::{get_used_binding, Binding};
+use crate::binding::r#trait::BindingTrait;
 use crate::gui::Gui;
 
 pub type OctaResult<V> = anyhow::Result<V>;
@@ -58,7 +58,6 @@ pub struct EngineConfig {
     pub shader_debug_printing: EngineFeatureValue,
 }
 
-
 pub struct Engine {
     pub num_frames_in_flight: usize,
     pub num_frames: usize,
@@ -76,60 +75,19 @@ pub struct Engine {
     pub context: Context,
 }
 
-pub trait State: Sized {
-    fn new(engine: &mut Engine) -> OctaResult<Self>;
-    
-    fn update(
-        &mut self,
-        engine: &mut Engine,
-        image_index: usize,
-        delta_time: Duration,
-    ) -> OctaResult<()>{
-        // prevents reports of unused parameters without needing to use #[allow]
-        let _ = engine;
-        let _ = image_index;
-        let _ = delta_time;
-        
-        Ok(())
-    }
-
-    fn record_render_commands(
-        &mut self,
-        engine: &mut Engine,
-        image_index: usize,
-    ) -> OctaResult<()> {
-        // prevents reports of unused parameters without needing to use #[allow]
-        let _ = engine;
-        let _ = image_index;
-
-        Ok(())
-    }
-    
-    fn on_window_event(&mut self, engine: &mut Engine, event: &WindowEvent) -> OctaResult<()> {
-        // prevents reports of unused parameters without needing to use #[allow]
-        let _ = engine;
-        let _ = event;
-
-        Ok(())
-    }
-
-    fn on_recreate_swapchain(&mut self, engine: &mut Engine) -> OctaResult<()> {
-        // prevents reports of unused parameters without needing to use #[allow]
-        let _ = engine;
-
-        Ok(())
-    }
-}
-
-pub fn run<A: State + 'static>(engine_config: EngineConfig) -> OctaResult<()> {
+pub fn run<B: BindingTrait>(engine_config: EngineConfig, bindings: Vec<Binding<B>>) -> OctaResult<()> {
     log_init("app_log.log");
 
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
     
+    let mut binding = get_used_binding(bindings)?;
+    
     let mut engine = Engine::new(&event_loop, &engine_config)?;
-
-    let mut state = A::new(&mut engine)?;
+    let mut render_state = binding.new_render_state(&mut engine)?;
+    let mut dropped_render_states: Vec<(B::RenderState, usize)> = vec![];
+    
+    let mut logic_state = binding.new_logic_state(&mut engine)?;
 
     let mut is_swapchain_dirty = false;
 
@@ -139,7 +97,8 @@ pub fn run<A: State + 'static>(engine_config: EngineConfig) -> OctaResult<()> {
     let fps_as_duration = Duration::from_secs_f64(1.0 / 60.0);
 
     event_loop.run(move |event, elwt| {
-        let state = &mut state; // Make sure it is dropped before engine
+        let logic_state = &mut logic_state; // Make sure it is dropped before engine
+        let render_state = &mut render_state; // Make sure it is dropped before engine
         
         // Send Event to Controls Struct
         engine.controls.handle_event(&event);
@@ -163,7 +122,7 @@ pub fn run<A: State + 'static>(engine_config: EngineConfig) -> OctaResult<()> {
             
             Event::WindowEvent { event, .. } => {
                 engine.stats_gui.handle_event(&engine.window, &event);
-                state.on_window_event(&mut engine, &event)
+                binding.on_window_event(render_state, logic_state, &mut engine, &event)
                     .expect("Failed in On Window Event");
 
                 match event {
@@ -212,14 +171,14 @@ pub fn run<A: State + 'static>(engine_config: EngineConfig) -> OctaResult<()> {
                         engine
                             .recreate_swapchain(dim.width, dim.height)
                             .expect("Failed to recreate swapchain");
-                        state.on_recreate_swapchain(&mut engine)
+                        binding.on_recreate_swapchain(render_state, logic_state, &mut engine)
                             .expect("Error on recreate swapchain callback");
                     } else {
                         return;
                     }
                 }
 
-                is_swapchain_dirty = engine.draw(state).expect("Failed to tick");
+                is_swapchain_dirty = engine.draw(&mut binding, render_state, logic_state, &mut dropped_render_states).expect("Failed to tick");
             }
             
             // Wait for gpu to finish pending work before closing app
@@ -303,7 +262,13 @@ impl Engine {
         self.context.device_wait_idle()
     }
 
-    fn draw<S: State>(&mut self, state: &mut S) -> OctaResult<bool> {
+    fn draw<B:BindingTrait>(
+        &mut self, 
+        binding: &mut Binding<B>, 
+        render_state: &mut B::RenderState, 
+        logic_state: &mut B::LogicState,
+        dropped_render_state: &mut Vec<(B::RenderState, usize)>
+    ) -> OctaResult<bool> {
         #[cfg(debug_assertions)]
         puffin::profile_function!();
 
@@ -333,13 +298,35 @@ impl Engine {
         };
         self.in_flight_frames.fence().reset()?;
 
+        
+        if let Binding::HotReload(b) = binding {
+            for i in (0..dropped_render_state.len()).rev() {
+                if dropped_render_state[i].1 == image_index {
+                    // Dosent work 
+                    //dropped_render_state.remove(i);
+                }
+            }
+            
+            if b.lib_reloader.can_update() {
+                debug!("Hot reload");
+                
+                b.lib_reloader.update()?;
+                
+                let mut new_render_state = binding.new_render_state(self)?;
+                mem::swap(render_state, &mut new_render_state);
+                dropped_render_state.push((new_render_state, image_index));
+                
+                debug!("Hot reload done");
+            }
+        }
+        
         {
             #[cfg(debug_assertions)]
             puffin::profile_scope!("update app");
-            state.update(self, image_index, self.frame_stats.frame_time)?;
+            binding.update(render_state, logic_state, self, image_index, self.frame_stats.frame_time)?;
         }
 
-        self.record_command_buffer(image_index, state)?;
+        self.record_command_buffer(image_index, binding, render_state, logic_state)?;
 
         self.context.graphics_queue.submit(
             &self.command_buffers[image_index],
@@ -372,7 +359,7 @@ impl Engine {
         Ok(false)
     }
 
-    fn record_command_buffer<S: State>(&mut self, image_index: usize, state: &mut S) -> OctaResult<()> {
+    fn record_command_buffer<B: BindingTrait>(&mut self, image_index: usize, binding: &Binding<B>, render_state: &mut B::RenderState, logic_state: &mut B::LogicState) -> OctaResult<()> {
         #[cfg(debug_assertions)]
         puffin::profile_function!();
 
@@ -390,7 +377,7 @@ impl Engine {
             #[cfg(debug_assertions)]
             puffin::profile_scope!("render app");
 
-            state.record_render_commands(self, image_index)?;
+            binding.record_render_commands(render_state, logic_state, self, image_index)?;
         }
 
         let buffer = &self.command_buffers[image_index];

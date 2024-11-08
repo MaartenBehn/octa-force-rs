@@ -1,5 +1,5 @@
 use winit::window::Fullscreen;
-use crate::{State, Engine};
+use crate::{Engine};
 
 impl Engine {
     pub fn set_fullscreen(&self, value: bool) {
