@@ -34,9 +34,10 @@ use winit::{
 };
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use crate::binding::{get_used_binding, Binding};
+use crate::binding::{get_binding, Binding};
 use crate::binding::r#trait::BindingTrait;
 use crate::gui::Gui;
+use crate::hot_reloading::HotReloadConfig;
 
 pub type OctaResult<V> = anyhow::Result<V>;
 
@@ -56,6 +57,7 @@ pub struct EngineConfig {
     pub compute_rendering: EngineFeatureValue,
     pub validation_layers: EngineFeatureValue,
     pub shader_debug_printing: EngineFeatureValue,
+    pub hot_reload_config: Option<HotReloadConfig>
 }
 
 pub struct Engine {
@@ -75,13 +77,13 @@ pub struct Engine {
     pub context: Context,
 }
 
-pub fn run<B: BindingTrait>(engine_config: EngineConfig, bindings: Vec<Binding<B>>) -> OctaResult<()> {
+pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
     log_init("app_log.log");
 
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
     
-    let mut binding = get_used_binding(bindings)?;
+    let mut binding = get_binding::<B>(&engine_config)?;
     
     let mut engine = Engine::new(&event_loop, &engine_config)?;
     let mut render_state = binding.new_render_state(&mut engine)?;
@@ -309,11 +311,14 @@ impl Engine {
             
             if b.lib_reloader.can_update() {
                 debug!("Hot reload");
+                b.active = true;
                 
                 b.lib_reloader.update()?;
                 
                 let mut new_render_state = binding.new_render_state(self)?;
                 mem::swap(render_state, &mut new_render_state);
+
+                dropped_render_state.clear();
                 dropped_render_state.push((new_render_state, image_index));
                 
                 debug!("Hot reload done");

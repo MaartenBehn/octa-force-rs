@@ -2,59 +2,24 @@ pub mod r#trait;
 
 use std::marker::PhantomData;
 use std::time::Duration;
-use anyhow::bail;
+use egui::Key::P;
 use libloading::Symbol;
 use winit::event::WindowEvent;
-use crate::{Engine, OctaResult};
+use crate::{Engine, EngineConfig, OctaResult};
 use crate::binding::r#trait::BindingTrait;
-use crate::hot_reloading::lib_reloader::LibReloader;
+use crate::hot_reloading::HotReloadController;
 
 pub enum Binding<B: BindingTrait> {
-    HotReload(HotReloadBinding),
-    Static(PhantomData<B>)
+    Static(PhantomData<B>),
+    HotReload(HotReloadController)
 }
 
-pub struct HotReloadBinding {
-    pub(crate) lib_reloader: LibReloader
-}
-
-impl HotReloadBinding {
-    pub fn new(lib_dir: String, lib_name: String) -> OctaResult<Self> {
-        let lib_reloader = LibReloader::new(lib_dir, lib_name, None, None)?;
-
-        Ok(HotReloadBinding{
-            lib_reloader,
-        })
-    }
-}
-
-pub fn get_used_binding<B: BindingTrait>(bindings: Vec<Binding<B>>) -> OctaResult<Binding<B>> {
-    #[cfg(not(debug_assertions))]
-    {
-        let _ = bindings; // Remove unused warning
-        return Ok(Binding::Static(PhantomData::default()));
-    }
-    
-    let mut hot_reload = None;
-    let mut static_binding = None;
-    for binding in bindings {
-        match binding {
-            Binding::HotReload(_) => {
-                hot_reload = Some(binding);
-            }
-            Binding::Static(_) => {
-                static_binding = Some(binding);
-            }
-        }
-    }
-
-    if hot_reload.is_some(){
-        Ok(hot_reload.unwrap())
-    } else if static_binding.is_some() {
-        Ok(static_binding.unwrap())
-    } else{
-        bail!("No Binding!")
-    }
+pub fn get_binding<B: BindingTrait>(engine_config: &EngineConfig) -> OctaResult<Binding<B>> {
+    Ok(if let Some(config) = &engine_config.hot_reload_config {
+        Binding::HotReload(HotReloadController::new(config.to_owned())?)
+    } else {
+        Binding::Static(PhantomData::default())
+    })
 }
 
 impl<B: BindingTrait> Binding<B> {
@@ -64,10 +29,14 @@ impl<B: BindingTrait> Binding<B> {
         
         match self {
             Binding::HotReload(b) => {
-                unsafe {
-                    let call: Symbol<unsafe extern fn(&mut Engine) -> OctaResult<B::RenderState>> = 
-                        b.lib_reloader.get_symbol("new_render_state")?;
-                    call(engine)
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern fn(&mut Engine) -> OctaResult<B::RenderState>> =
+                            b.lib_reloader.get_symbol("new_render_state")?;
+                        call(engine)
+                    }
+                } else {
+                    B::new_render_state(engine)
                 }
             }
             Binding::Static(_) => {
@@ -82,10 +51,14 @@ impl<B: BindingTrait> Binding<B> {
 
         match self {
             Binding::HotReload(b) => {
-                unsafe {
-                    let call: Symbol<unsafe extern fn(&mut Engine) -> OctaResult<B::LogicState>> =
-                        b.lib_reloader.get_symbol("new_logic_state")?;
-                    call(engine)
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern fn(&mut Engine) -> OctaResult<B::LogicState>> =
+                            b.lib_reloader.get_symbol("new_logic_state")?;
+                        call(engine)
+                    }
+                } else {
+                    B::new_logic_state(engine)
                 }
             }
             Binding::Static(_) => {
@@ -107,10 +80,14 @@ impl<B: BindingTrait> Binding<B> {
         
         match self {
             Binding::HotReload(b) => {
-                unsafe {
-                    let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, usize, Duration) -> OctaResult<()>> =
-                        b.lib_reloader.get_symbol("update")?;
-                    call(render_state, logic_state, engine, image_index, delta_time)
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, usize, Duration) -> OctaResult<()>> =
+                            b.lib_reloader.get_symbol("update")?;
+                        call(render_state, logic_state, engine, image_index, delta_time)
+                    }
+                } else {
+                    B::update(render_state, logic_state, engine, image_index, delta_time)
                 }
             }
             Binding::Static(_) => {
@@ -131,10 +108,14 @@ impl<B: BindingTrait> Binding<B> {
         
         match self {
             Binding::HotReload(b) => {
-                unsafe {
-                    let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, usize) -> OctaResult<()>> =
-                        b.lib_reloader.get_symbol("record_render_commands")?;
-                    call(render_state, logic_state, engine, image_index)
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, usize) -> OctaResult<()>> =
+                            b.lib_reloader.get_symbol("record_render_commands")?;
+                        call(render_state, logic_state, engine, image_index)
+                    }
+                } else {
+                    B::record_render_commands(render_state, logic_state, engine, image_index)
                 }
             }
             Binding::Static(_) => {
@@ -155,10 +136,14 @@ impl<B: BindingTrait> Binding<B> {
         
         match self {
             Binding::HotReload(b) => {
-                unsafe {
-                    let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, &WindowEvent) -> OctaResult<()>> =
-                        b.lib_reloader.get_symbol("on_window_event")?;
-                    call(render_state, logic_state, engine, event)
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, &WindowEvent) -> OctaResult<()>> =
+                            b.lib_reloader.get_symbol("on_window_event")?;
+                        call(render_state, logic_state, engine, event)
+                    }
+                } else {
+                    B::on_window_event(render_state, logic_state, engine, event)
                 }
             }
             Binding::Static(_) => {
@@ -178,10 +163,14 @@ impl<B: BindingTrait> Binding<B> {
         
         match self {
             Binding::HotReload(b) => {
-                unsafe {
-                    let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine) -> OctaResult<()>> =
-                        b.lib_reloader.get_symbol("on_recreate_swapchain")?;
-                    call(render_state, logic_state, engine)
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine) -> OctaResult<()>> =
+                            b.lib_reloader.get_symbol("on_recreate_swapchain")?;
+                        call(render_state, logic_state, engine)
+                    }
+                } else {
+                    B::on_recreate_swapchain(render_state, logic_state, engine)
                 }
             }
             Binding::Static(_) => {
