@@ -2,8 +2,8 @@ pub mod r#trait;
 
 use std::marker::PhantomData;
 use std::time::Duration;
-use egui::Key::P;
 use libloading::Symbol;
+use log::Log;
 use winit::event::WindowEvent;
 use crate::{Engine, EngineConfig, OctaResult};
 use crate::binding::r#trait::BindingTrait;
@@ -23,6 +23,23 @@ pub fn get_binding<B: BindingTrait>(engine_config: &EngineConfig) -> OctaResult<
 }
 
 impl<B: BindingTrait> Binding<B> {
+    pub fn init_hot_reload(&self) -> OctaResult<()> {
+        match self {
+            Binding::HotReload(b) => {
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern fn(&'static dyn Log) -> OctaResult<()>> =
+                            b.lib_reloader.get_symbol("init_hot_reload")?;
+                        return call(log::logger())
+                    }
+                }
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+    
     pub fn new_render_state(&self, engine: &mut Engine) -> OctaResult<B::RenderState> {
         #[cfg(not(debug_assertions))]
         return B::new_render_state(engine);

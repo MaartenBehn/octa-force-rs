@@ -1,3 +1,5 @@
+use libloading::Symbol;
+use log::Log;
 use crate::hot_reloading::lib_reloader::LibReloader;
 use crate::OctaResult;
 
@@ -20,6 +22,13 @@ impl HotReloadController {
         let lib_reloader = LibReloader::new(
             hot_reload_config.lib_dir,
             hot_reload_config.lib_name, None, None)?;
+
+        
+        unsafe {
+            let call: Symbol<unsafe extern fn(&'static dyn Log) -> OctaResult<()>> =
+                lib_reloader.get_symbol("init_hot_reload")?;
+            call(log::logger())?;
+        }
         
         Ok(HotReloadController {
             lib_reloader,

@@ -1,27 +1,34 @@
-use std::fs::File;
+use log::{LevelFilter, Log};
+use simplelog::{ColorChoice, Config, TermLogger, TerminalMode, WriteLogger};
+use crate::OctaResult;
 
-use log::LevelFilter;
-use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode, WriteLogger};
-
-pub fn log_init(file_name: &str) {
+pub fn log_init() -> OctaResult<()> {
     #[cfg(debug_assertions)]
     let log_level = LevelFilter::Debug;
 
     #[cfg(not(debug_assertions))]
     let log_level = LevelFilter::Info;
 
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            log_level,
-            Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Trace,
-            Config::default(),
-            File::create(file_name).unwrap(),
-        ),
-    ])
-    .unwrap();
+    TermLogger::init(
+        log_level,
+        Config::default(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )?;
+    
+    Ok(())
+}
+
+pub fn setup_logger(
+    logger: &'static dyn Log,
+) -> OctaResult<()> {
+    #[cfg(debug_assertions)]
+    let log_level = LevelFilter::Debug;
+
+    #[cfg(not(debug_assertions))]
+    let log_level = LevelFilter::Info;
+    
+    log::set_max_level(log_level);
+    log::set_logger(logger)?;
+    Ok(())
 }

@@ -11,7 +11,7 @@ pub mod camera;
 pub mod controls;
 pub mod gui;
 pub mod logger;
-mod stats;
+pub mod stats;
 pub mod vulkan;
 pub mod utils;
 pub mod hot_reloading;
@@ -21,7 +21,6 @@ use crate::stats::{FrameStats, StatsDisplayMode};
 use ash::vk::{self};
 use controls::Controls;
 use glam::UVec2;
-use logger::log_init;
 use std::{mem, thread, time::{Duration, Instant}};
 use log::debug;
 use puffin_egui::puffin;
@@ -38,6 +37,7 @@ use crate::binding::{get_binding, Binding};
 use crate::binding::r#trait::BindingTrait;
 use crate::gui::Gui;
 use crate::hot_reloading::HotReloadConfig;
+use crate::logger::{log_init};
 
 pub type OctaResult<V> = anyhow::Result<V>;
 
@@ -78,8 +78,8 @@ pub struct Engine {
 }
 
 pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
-    log_init("app_log.log");
-
+    log_init()?;
+    
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
     
@@ -245,7 +245,7 @@ impl Engine {
             in_flight_frames,
             controls,
             frame_stats,
-            stats_gui
+            stats_gui,
         })
     }
 
@@ -314,6 +314,8 @@ impl Engine {
                 b.active = true;
                 
                 b.lib_reloader.update()?;
+
+                binding.init_hot_reload()?;
                 
                 let mut new_render_state = binding.new_render_state(self)?;
                 mem::swap(render_state, &mut new_render_state);
