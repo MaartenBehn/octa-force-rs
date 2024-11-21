@@ -5,6 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(vulkan_1_0)', 'cfg(vulkan_1_1)', 'cfg(vulkan_1_2)', 'cfg(vulkan_1_3)'] }
+
 [dependencies]
 log = "0.4"
 simplelog = "0.11.2"

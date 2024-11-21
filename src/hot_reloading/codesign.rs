@@ -5,12 +5,15 @@ use std::process::{Command, Stdio};
 #[cfg(feature = "verbose")]
 use log;
 
+#[allow(dead_code)]
 static CODESIGN_BIN: &str = "codesign";
 
+#[allow(dead_code)]
 pub(crate) struct CodeSigner {
     found: bool,
 }
 
+#[allow(dead_code)]
 impl CodeSigner {
     pub(crate) fn new() -> Self {
         let found = !matches!(Command::new(CODESIGN_BIN)

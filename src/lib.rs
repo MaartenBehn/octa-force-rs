@@ -22,7 +22,7 @@ use ash::vk::{self};
 use controls::Controls;
 use glam::UVec2;
 use std::{mem, thread, time::{Duration, Instant}};
-use log::debug;
+use log::{debug, info};
 use puffin_egui::puffin;
 use vulkan::*;
 use winit::{
@@ -99,8 +99,11 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
     let fps_as_duration = Duration::from_secs_f64(1.0 / 60.0);
 
     event_loop.run(move |event, elwt| {
-        let logic_state = &mut logic_state; // Make sure it is dropped before engine
-        let render_state = &mut render_state; // Make sure it is dropped before engine
+
+        // Make sure it is dropped before engine so it properly stops
+        let logic_state = &mut logic_state; 
+        let render_state = &mut render_state;
+        let dropped_render_states = &mut dropped_render_states; 
         
         // Send Event to Controls Struct
         engine.controls.handle_event(&event);
@@ -180,13 +183,17 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
                     }
                 }
 
-                is_swapchain_dirty = engine.draw(&mut binding, render_state, logic_state, &mut dropped_render_states).expect("Failed to tick");
+                is_swapchain_dirty = engine.draw(&mut binding, render_state, logic_state, dropped_render_states).expect("Failed to tick");
             }
             
             // Wait for gpu to finish pending work before closing app
-            Event::LoopExiting => engine
+            Event::LoopExiting => {engine
                 .wait_for_gpu()
-                .expect("Failed to wait for gpu to finish work"),
+                .expect("Failed to wait for gpu to finish work");
+                
+                info!("Stopping")
+            
+            },
             _ => (),
         }
     })?;
@@ -250,7 +257,7 @@ impl Engine {
     }
 
     fn recreate_swapchain(&mut self, width: u32, height: u32) -> OctaResult<()> {
-        log::debug!("Recreating the swapchain");
+        debug!("Recreating the swapchain");
 
         self.wait_for_gpu()?;
 
@@ -304,8 +311,8 @@ impl Engine {
         if let Binding::HotReload(b) = binding {
             for i in (0..dropped_render_state.len()).rev() {
                 if dropped_render_state[i].1 == image_index {
-                    // Dosent work 
-                    //dropped_render_state.remove(i);
+                    // Dosen't work 
+                    dropped_render_state.remove(i);
                 }
             }
             
@@ -319,8 +326,7 @@ impl Engine {
                 
                 let mut new_render_state = binding.new_render_state(self)?;
                 mem::swap(render_state, &mut new_render_state);
-
-                dropped_render_state.clear();
+                
                 dropped_render_state.push((new_render_state, image_index));
                 
                 debug!("Hot reload done");

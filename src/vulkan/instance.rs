@@ -6,11 +6,10 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
-use ash::vk::{Format, SurfaceFormatKHR};
 use log::info;
 use raw_window_handle::HasRawDisplayHandle;
 
-use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, vulkan::surface::Surface, EngineConfig};
+use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
 use crate::EngineFeatureValue::{Needed, NotUsed};
 
 #[allow(dead_code)]
@@ -29,10 +28,10 @@ impl Instance {
         engine_config: &EngineConfig,
     ) -> Result<Self> {
 
-        #[cfg(vulkan_1_0)] let version = crate::vulkan::Version::VK_1_0;
-        #[cfg(vulkan_1_1)] let version = crate::vulkan::Version::VK_1_1;
-        #[cfg(vulkan_1_2)] let version = crate::vulkan::Version::VK_1_2;
-        #[cfg(vulkan_1_3)] let version = crate::vulkan::Version::VK_1_3;
+        #[cfg(vulkan_1_0)] let version = crate::vulkan::Version::Vk1_0;
+        #[cfg(vulkan_1_1)] let version = crate::vulkan::Version::Vk1_1;
+        #[cfg(vulkan_1_2)] let version = crate::vulkan::Version::Vk1_2;
+        #[cfg(vulkan_1_3)] let version = crate::vulkan::Version::Vk1_3;
 
         info!("Using Vulkan Version {:?}", version);
 

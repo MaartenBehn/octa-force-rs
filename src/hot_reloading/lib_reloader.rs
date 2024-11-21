@@ -31,6 +31,7 @@ pub struct LibReloader {
     load_counter: usize,
     lib_dir: PathBuf,
     lib_name: String,
+    running: Arc<AtomicBool>,
     changed: Arc<AtomicBool>,
     lib: Option<Library>,
     watched_lib_file: PathBuf,
@@ -87,10 +88,12 @@ impl LibReloader {
             (0, None)
         };
 
+        let running = Arc::new(AtomicBool::new(true));
         let lib_file_hash = Arc::new(AtomicU32::new(lib_file_hash));
         let changed = Arc::new(AtomicBool::new(false));
         let file_change_subscribers = Arc::new(Mutex::new(Vec::new()));
         Self::watch(
+            running.clone(),
             watched_lib_file.clone(),
             lib_file_hash.clone(),
             changed.clone(),
@@ -111,6 +114,7 @@ impl LibReloader {
             #[cfg(target_os = "macos")]
             codesigner,
             loaded_lib_name_template,
+            running,
         };
 
         Ok(lib_loader)
@@ -191,6 +195,7 @@ impl LibReloader {
 
     /// Watch for changes of `lib_file`.
     fn watch(
+        running: Arc<AtomicBool>,
         lib_file: impl AsRef<Path>,
         lib_file_hash: Arc<AtomicU32>,
         changed: Arc<AtomicBool>,
@@ -255,6 +260,11 @@ impl LibReloader {
                         break;
                     }
                     Ok(events) => {
+                        if !running.load(Ordering::Acquire) {
+                            log::info!("Stopping Hot Reload Watcher");
+                            break;
+                        }
+                        
                         let events = match events {
                             Err(errors) => {
                                 log::error!("{} file watcher error!", errors.len());
@@ -332,6 +342,8 @@ impl LibReloader {
 /// Deletes the currently loaded lib file if it exists
 impl Drop for LibReloader {
     fn drop(&mut self) {
+        self.running.store(false, Ordering::Release);
+        
         if self.loaded_lib_file.exists() {
             log::trace!("removing {:?}", self.loaded_lib_file);
             let _ = fs::remove_file(&self.loaded_lib_file);

@@ -1,11 +1,9 @@
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
 
 use anyhow::{bail, Result};
 use ash::{vk};
-use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceType, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
-use log::{info};
+use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
 
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
 use crate::vulkan::instance::Instance;
@@ -35,6 +33,7 @@ pub struct PhysicalDevice {
 
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct PhysicalDeviceCapabilities {
     pub inner: vk::PhysicalDevice,
     pub name: String,
@@ -44,8 +43,8 @@ pub struct PhysicalDeviceCapabilities {
     pub limits_ok: bool,
 
     pub queues: Vec<QueueFamily>,
-    pub best_graphics_queue: Option<QueueFamily>,
-    pub best_present_queue: Option<QueueFamily>,
+    pub graphics_queues: Vec<QueueFamily>,
+    pub present_queues: Vec<QueueFamily>,
 
     pub required_extensions: HashMap<String, bool>,
     pub required_extensions_ok: bool,
@@ -97,12 +96,12 @@ impl Instance {
                     log::info!(" -- Limits not ok");
                 }
                 
-                if device_capabilities.best_graphics_queue.is_none() {
+                if device_capabilities.graphics_queues.is_empty() {
                     ok = false;
                     log::info!(" -- No Graphics Queue");
                 }
 
-                if device_capabilities.best_present_queue.is_none() {
+                if device_capabilities.present_queues.is_empty() {
                     ok = false;
                     log::info!(" -- No Present Queue");
                 }
@@ -238,8 +237,8 @@ impl Instance {
             name: selected_device_capabilities.name.to_owned(),
             device_type,
             limits: selected_device_capabilities.limits,
-            graphics_queue_family: selected_device_capabilities.best_graphics_queue.unwrap(),
-            present_queue_family: selected_device_capabilities.best_present_queue.unwrap(),
+            graphics_queue_family: selected_device_capabilities.graphics_queues[0],
+            present_queue_family: selected_device_capabilities.present_queues[0],
             wanted_extensions,
             surface_format,
             render_storage_image_format,
@@ -327,24 +326,18 @@ impl PhysicalDeviceCapabilities {
 
 
         // Choose Graphics and Present Queue
-        let mut graphics = None;
-        let mut present = None;
-
+        let mut graphics = vec![];
+        let mut present = vec![];
         for family in queue_families.iter().filter(|f| f.has_queues()) {
             if family.supports_graphics()
                 && family.supports_compute()
                 && family.supports_timestamp_queries()
-                && graphics.is_none()
             {
-                graphics = Some(*family);
+                graphics.push(*family);
             }
 
-            if family.supports_present() && present.is_none() {
-                present = Some(*family);
-            }
-
-            if graphics.is_some() && present.is_some() {
-                break;
+            if family.supports_present() {
+                present.push(*family);
             }
         }
 
@@ -438,14 +431,13 @@ impl PhysicalDeviceCapabilities {
             PresentModeKHR::SHARED_DEMAND_REFRESH,
             PresentModeKHR::IMMEDIATE,
         ];
-        let mut present_mode = None;
+        let mut sorted_supported_present_modes = vec![];
         for wanted in present_mode_prio {
             if supported_present_modes.contains(&wanted) {
-                present_mode = Some(wanted);
-                break;
+                sorted_supported_present_modes.push(wanted);
             }
         }
-
+        
         // Device Features
         let mut required_features = PhysicalDeviceFeatures::new(required_device_features);
         unsafe { instance.inner.get_physical_device_features2(inner, &mut required_features.vulkan_features()) };
@@ -464,8 +456,8 @@ impl PhysicalDeviceCapabilities {
             limits_ok,
 
             queues: queue_families,
-            best_graphics_queue: graphics,
-            best_present_queue: present,
+            graphics_queues: graphics, 
+            present_queues: present,
 
             required_extensions,
             required_extensions_ok,
@@ -478,7 +470,7 @@ impl PhysicalDeviceCapabilities {
             render_storage_image_formats,
             supported_depth_formats,
 
-            supported_present_modes,
+            supported_present_modes: sorted_supported_present_modes,
 
             required_device_features,
             required_device_features_ok,

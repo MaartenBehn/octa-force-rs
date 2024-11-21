@@ -4,7 +4,6 @@ use anyhow::Result;
 use ash::{vk, Device as AshDevice};
 use crate::{
     vulkan::instance::Instance,
-    vulkan::physical_device::PhysicalDeviceCapabilities,
     vulkan::queue::{Queue, QueueFamily},
 };
 use crate::vulkan::physical_device::{PhysicalDevice, PhysicalDeviceFeatures};

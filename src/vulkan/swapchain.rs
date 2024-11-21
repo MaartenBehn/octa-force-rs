@@ -5,7 +5,6 @@ use ash::{extensions::khr::Swapchain as AshSwapchain, vk};
 use ash::vk::{ImageUsageFlags};
 use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
-use log::debug;
 
 use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore, ImageAndView};
 use crate::vulkan::Image;

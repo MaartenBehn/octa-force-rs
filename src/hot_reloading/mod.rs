@@ -22,7 +22,6 @@ impl HotReloadController {
         let lib_reloader = LibReloader::new(
             hot_reload_config.lib_dir,
             hot_reload_config.lib_name, None, None)?;
-
         
         unsafe {
             let call: Symbol<unsafe extern fn(&'static dyn Log) -> OctaResult<()>> =

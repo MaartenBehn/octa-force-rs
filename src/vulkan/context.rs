@@ -1,14 +1,12 @@
-use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use ash::{vk, Entry};
-use ash::vk::{PhysicalDeviceType};
 use gpu_allocator::{
     vulkan::{Allocator, AllocatorCreateDesc},
     AllocatorDebugSettings,
 };
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::physical_device::PhysicalDeviceCapabilities, vulkan::queue::{Queue, QueueFamily}, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig, EngineFeatureValue};
+use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::queue::Queue, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig, EngineFeatureValue};
 use crate::EngineFeatureValue::{Needed, Wanted};
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]

@@ -1,5 +1,5 @@
 use log::{LevelFilter, Log};
-use simplelog::{ColorChoice, Config, TermLogger, TerminalMode, WriteLogger};
+use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
 use crate::OctaResult;
 
 pub fn log_init() -> OctaResult<()> {

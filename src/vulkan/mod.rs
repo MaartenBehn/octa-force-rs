@@ -40,19 +40,19 @@ pub use sync::*;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Version {
-    VK_1_0,
-    VK_1_1,
-    VK_1_2,
-    VK_1_3,
+    Vk1_0,
+    Vk1_1,
+    Vk1_2,
+    Vk1_3,
 }
 
 impl Version {
     pub(crate) fn make_api_version(&self) -> u32 {
         match self {
-            Version::VK_1_0 => {ash::vk::make_api_version(0, 1, 0, 0)}
-            Version::VK_1_1 => {ash::vk::make_api_version(0, 1, 1, 0)}
-            Version::VK_1_2 => {ash::vk::make_api_version(0, 1, 2, 0)}
-            Version::VK_1_3 => {ash::vk::make_api_version(0, 1, 3, 0)}
+            Version::Vk1_0 => {ash::vk::make_api_version(0, 1, 0, 0)}
+            Version::Vk1_1 => {ash::vk::make_api_version(0, 1, 1, 0)}
+            Version::Vk1_2 => {ash::vk::make_api_version(0, 1, 2, 0)}
+            Version::Vk1_3 => {ash::vk::make_api_version(0, 1, 3, 0)}
         }
     }
 }
@@ -60,10 +60,10 @@ impl Version {
 impl Debug for Version {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Version::VK_1_0 => {f.write_str("1.0.")}
-            Version::VK_1_1 => {f.write_str("1.1.")}
-            Version::VK_1_2 => {f.write_str("1.2.")}
-            Version::VK_1_3 => {f.write_str("1.3.")}
+            Version::Vk1_0 => {f.write_str("1.0.")}
+            Version::Vk1_1 => {f.write_str("1.1.")}
+            Version::Vk1_2 => {f.write_str("1.2.")}
+            Version::Vk1_3 => {f.write_str("1.3.")}
         }
     }
 }
