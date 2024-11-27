@@ -97,7 +97,7 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
     #[cfg(debug_assertions)]
     let mut dropped_render_states: Vec<(B::RenderState, usize)> = vec![];
     
-    let mut logic_state = binding.new_logic_state(&mut engine)?;
+    let mut logic_state = binding.new_logic_state(&mut render_state, &mut engine)?;
 
     let mut is_swapchain_dirty = false;
 

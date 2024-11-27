@@ -7,7 +7,7 @@ pub trait BindingTrait {
     type RenderState;
     type LogicState;
     fn new_render_state(engine: &mut Engine) -> OctaResult<Self::RenderState>;
-    fn new_logic_state(engine: &mut Engine) -> OctaResult<Self::LogicState>;
+    fn new_logic_state(render_state: &mut Self::RenderState, engine: &mut Engine) -> OctaResult<Self::LogicState>;
 
     fn update(
         render_state: &mut Self::RenderState,

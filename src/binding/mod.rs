@@ -75,25 +75,25 @@ impl<B: BindingTrait> Binding<B> {
         }
     }
 
-    pub fn new_logic_state(&self, engine: &mut Engine) -> OctaResult<B::LogicState> {
+    pub fn new_logic_state(&self, render_state: &mut B::RenderState, engine: &mut Engine) -> OctaResult<B::LogicState> {
         #[cfg(not(debug_assertions))]
-        return B::new_logic_state(engine);
+        return B::new_logic_state(render_state, engine);
 
         #[cfg(debug_assertions)]
         match self {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern fn(&mut Engine) -> OctaResult<B::LogicState>> =
+                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut Engine) -> OctaResult<B::LogicState>> =
                             b.lib_reloader.get_symbol("new_logic_state")?;
-                        call(engine)
+                        call(render_state, engine)
                     }
                 } else {
-                    B::new_logic_state(engine)
+                    B::new_logic_state(render_state, engine)
                 }
             }
             Binding::Static(_) => {
-                B::new_logic_state(engine)
+                B::new_logic_state(render_state, engine)
             }
         }
     }
