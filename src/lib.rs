@@ -57,6 +57,8 @@ pub struct EngineConfig {
     pub compute_rendering: EngineFeatureValue,
     pub validation_layers: EngineFeatureValue,
     pub shader_debug_printing: EngineFeatureValue,
+    pub shader_debug_clock: EngineFeatureValue,
+
     pub hot_reload_config: Option<HotReloadConfig>
 }
 
@@ -206,7 +208,7 @@ impl Engine {
         event_loop: &EventLoop<()>,
         engine_config: &EngineConfig
     ) -> OctaResult<Self> {
-        log::info!("Creating Engine");
+        info!("Creating Engine");
 
         let window = WindowBuilder::new()
             .with_title(&engine_config.name)

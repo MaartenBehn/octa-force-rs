@@ -47,8 +47,7 @@ impl Context {
 
         // Vulkan surface
         let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;
-
-
+        
         // Physical Device
         let mut required_extensions = vec![
             "VK_KHR_swapchain".to_owned(),
@@ -96,6 +95,31 @@ impl Context {
             wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
             required_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
         }
+        
+        if engine_config.shader_debug_printing == Wanted {
+            wanted_extensions.push("VK_KHR_shader_clock".to_owned());
+
+            /*
+            wanted_device_features.append(&mut vec![
+                "shaderClock".to_owned(),
+            ]);
+            
+             */
+        } else if engine_config.shader_debug_printing == Needed {
+            wanted_extensions.push("VK_KHR_shader_clock".to_owned());
+            required_extensions.push("VK_KHR_shader_clock".to_owned());
+
+            /*
+            wanted_device_features.append(&mut vec![
+                "shaderClock".to_owned(),
+            ]);
+
+            required_device_features.append(&mut vec![
+                "shaderClock".to_owned(),
+            ]);
+            
+             */
+        };
 
         if engine_config.ray_tracing == Wanted {
             required_extensions.append(&mut vec![
@@ -141,13 +165,14 @@ impl Context {
         )?;
         
         let debug_printing = instance.debug_printing && physical_device.wanted_extensions["VK_KHR_shader_non_semantic_info"];
-
+        let shader_clock = physical_device.wanted_extensions["VK_KHR_shader_clock"];
         
         let device = Arc::new(Device::new(
             &instance,
             &physical_device,
             &required_extensions,
             &required_device_features,
+            shader_clock,
         )?);
 
         #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]

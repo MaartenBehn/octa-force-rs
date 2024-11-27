@@ -10,6 +10,7 @@ use crate::vulkan::physical_device::{PhysicalDevice, PhysicalDeviceFeatures};
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::extensions::khr::Synchronization2;
+use ash::vk::{PhysicalDeviceShaderClockFeaturesKHR};
 
 pub struct Device {
     pub inner: AshDevice,
@@ -21,6 +22,7 @@ impl Device {
         physical_device: &PhysicalDevice,
         extensions: &Vec<String>,
         device_features: &Vec<String>,
+        shader_clock: bool,
     ) -> Result<Self> {
         let queue_priorities = [1.0f32];
         
@@ -53,10 +55,21 @@ impl Device {
         let mut features = PhysicalDeviceFeatures::new(device_features);
         let mut vulkan_features = features.vulkan_features();
 
-        let device_create_info = vk::DeviceCreateInfo::builder()
+        let mut clock_feature = if shader_clock {
+            Some(PhysicalDeviceShaderClockFeaturesKHR::builder()
+                .shader_device_clock(false)
+                .shader_subgroup_clock(true)
+                .build())
+        } else { None };
+        
+        let mut device_create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&queue_create_infos)
             .enabled_extension_names(&device_extensions_ptrs)
             .push_next(&mut vulkan_features);
+        
+        if clock_feature.is_some() {
+            device_create_info = device_create_info.push_next(clock_feature.as_mut().unwrap());
+        }
 
         let inner = unsafe {
             instance
@@ -73,7 +86,6 @@ impl Device {
         self: &Arc<Self>,
         queue_family: QueueFamily,
         queue_index: u32,
-
         #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
         synchronization2: Synchronization2,
     ) -> Queue {
@@ -81,10 +93,8 @@ impl Device {
 
         Queue::new(
             inner,
-
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
             synchronization2,
-
             #[cfg(vulkan_1_3)]
             self.clone(),
         )

@@ -4,7 +4,7 @@ use std::ffi::CStr;
 use anyhow::{bail, Result};
 use ash::{vk};
 use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
-
+use log::error;
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
 use crate::vulkan::instance::Instance;
 
@@ -550,6 +550,11 @@ impl PhysicalDeviceFeatures {
             let found = self.features13.synchronization2 == vk::TRUE;
             result.insert("synchronization2".to_owned(), found);
             all &= found;
+        }
+        
+        if !required_features.is_empty() {
+            error!("Device Feature Check: {:?}, not implemented!", required_features);
+            unimplemented!()
         }
 
         (all, result)
