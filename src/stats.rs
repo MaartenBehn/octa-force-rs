@@ -1,6 +1,7 @@
 use crate::Queue;
 use std::time::Duration;
 use egui::Align2;
+#[cfg(debug_assertions)]
 use puffin_egui::puffin;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

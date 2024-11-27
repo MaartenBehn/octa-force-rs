@@ -1,6 +1,6 @@
 use std::ffi::{c_char, c_void, CStr, CString};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use ash::{
     extensions::ext::DebugUtils,
     vk::{self, DebugUtilsMessengerEXT},
@@ -9,7 +9,12 @@ use ash::{
 use log::info;
 use raw_window_handle::HasRawDisplayHandle;
 
+#[cfg(debug_assertions)]
+use anyhow::bail;
+
 use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
+
+#[cfg(debug_assertions)]
 use crate::EngineFeatureValue::{Needed, NotUsed};
 
 #[allow(dead_code)]
@@ -49,6 +54,9 @@ impl Instance {
             .application_info(&app_info);
 
         // Validation Layers
+        #[cfg(not(debug_assertions))]
+        let validation_layers = false;
+        #[cfg(debug_assertions)]
         let mut validation_layers = false;
         #[cfg(debug_assertions)]
         let (_layer_names, layer_names_ptrs) = get_validation_layer_names_and_pointers();
@@ -64,11 +72,14 @@ impl Instance {
         }
 
         // Debug Printing
+        #[cfg(not(debug_assertions))]
+        let debug_printing = false;
+        #[cfg(debug_assertions)]
         let mut debug_printing = false;
         #[cfg(debug_assertions)]
         let mut validation_features = vk::ValidationFeaturesEXT::builder();
         #[cfg(debug_assertions)]
-        if engine_config.shader_debug_printing != NotUsed && validation_layers {
+        if engine_config.shader_debug_printing != NotUsed {
             if validation_layers {
                 validation_features = validation_features.enabled_validation_features(&[vk::ValidationFeatureEnableEXT::DEBUG_PRINTF]);
                 instance_create_info = instance_create_info.push_next(&mut validation_features);

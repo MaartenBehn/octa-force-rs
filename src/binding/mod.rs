@@ -2,9 +2,15 @@ pub mod r#trait;
 
 use std::marker::PhantomData;
 use std::time::Duration;
-use libloading::Symbol;
-use log::Log;
+
 use winit::event::WindowEvent;
+
+#[cfg(debug_assertions)]
+use libloading::Symbol;
+#[cfg(debug_assertions)]
+use log::Log;
+
+
 use crate::{Engine, EngineConfig, OctaResult};
 use crate::binding::r#trait::BindingTrait;
 use crate::hot_reloading::HotReloadController;
@@ -14,8 +20,12 @@ pub enum Binding<B: BindingTrait> {
     HotReload(HotReloadController)
 }
 
-pub fn get_binding<B: BindingTrait>(engine_config: &EngineConfig) -> OctaResult<Binding<B>> {
-    Ok(if let Some(config) = &engine_config.hot_reload_config {
+pub fn get_binding<B: BindingTrait>(_engine_config: &EngineConfig) -> OctaResult<Binding<B>> {
+    #[cfg(not(debug_assertions))]
+    return Ok(Binding::Static(PhantomData::default()));
+
+    #[cfg(debug_assertions)]
+    Ok(if let Some(config) = &_engine_config.hot_reload_config {
         Binding::HotReload(HotReloadController::new(config.to_owned())?)
     } else {
         Binding::Static(PhantomData::default())
@@ -23,6 +33,8 @@ pub fn get_binding<B: BindingTrait>(engine_config: &EngineConfig) -> OctaResult<
 }
 
 impl<B: BindingTrait> Binding<B> {
+
+    #[cfg(debug_assertions)]
     pub fn init_hot_reload(&self) -> OctaResult<()> {
         match self {
             Binding::HotReload(b) => {
@@ -43,7 +55,8 @@ impl<B: BindingTrait> Binding<B> {
     pub fn new_render_state(&self, engine: &mut Engine) -> OctaResult<B::RenderState> {
         #[cfg(not(debug_assertions))]
         return B::new_render_state(engine);
-        
+
+        #[cfg(debug_assertions)]
         match self {
             Binding::HotReload(b) => {
                 if b.active {
@@ -66,6 +79,7 @@ impl<B: BindingTrait> Binding<B> {
         #[cfg(not(debug_assertions))]
         return B::new_logic_state(engine);
 
+        #[cfg(debug_assertions)]
         match self {
             Binding::HotReload(b) => {
                 if b.active {
@@ -93,8 +107,9 @@ impl<B: BindingTrait> Binding<B> {
         delta_time: Duration
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::update(engine);
-        
+        return B::update(render_state, logic_state, engine, image_index, delta_time);
+
+        #[cfg(debug_assertions)]
         match self {
             Binding::HotReload(b) => {
                 if b.active {
@@ -121,8 +136,9 @@ impl<B: BindingTrait> Binding<B> {
         image_index: usize
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::record_render_commands(engine);
-        
+        return B::record_render_commands(render_state, logic_state, engine, image_index);
+
+        #[cfg(debug_assertions)]
         match self {
             Binding::HotReload(b) => {
                 if b.active {
@@ -149,8 +165,9 @@ impl<B: BindingTrait> Binding<B> {
         event: &WindowEvent
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::on_window_event(engine);
-        
+        return B::on_window_event(render_state, logic_state, engine, event);
+
+        #[cfg(debug_assertions)]
         match self {
             Binding::HotReload(b) => {
                 if b.active {
@@ -176,8 +193,9 @@ impl<B: BindingTrait> Binding<B> {
         engine: &mut Engine
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::on_recreate_swapchain(engine);
-        
+        return B::on_recreate_swapchain(render_state, logic_state, engine);
+
+        #[cfg(debug_assertions)]
         match self {
             Binding::HotReload(b) => {
                 if b.active {

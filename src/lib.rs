@@ -21,9 +21,8 @@ use crate::stats::{FrameStats, StatsDisplayMode};
 use ash::vk::{self};
 use controls::Controls;
 use glam::UVec2;
-use std::{mem, thread, time::{Duration, Instant}};
+use std::{thread, time::{Duration, Instant}};
 use log::{debug, info};
-use puffin_egui::puffin;
 use vulkan::*;
 use winit::{
     dpi::PhysicalSize,
@@ -33,6 +32,12 @@ use winit::{
 };
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
+
+#[cfg(debug_assertions)]
+use puffin_egui::puffin;
+#[cfg(debug_assertions)]
+use std::mem;
+
 use crate::binding::{get_binding, Binding};
 use crate::binding::r#trait::BindingTrait;
 use crate::gui::Gui;
@@ -89,6 +94,7 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
     
     let mut engine = Engine::new(&event_loop, &engine_config)?;
     let mut render_state = binding.new_render_state(&mut engine)?;
+    #[cfg(debug_assertions)]
     let mut dropped_render_states: Vec<(B::RenderState, usize)> = vec![];
     
     let mut logic_state = binding.new_logic_state(&mut engine)?;
@@ -105,6 +111,7 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
         // Make sure it is dropped before engine so it properly stops
         let logic_state = &mut logic_state; 
         let render_state = &mut render_state;
+        #[cfg(debug_assertions)]
         let dropped_render_states = &mut dropped_render_states; 
         
         // Send Event to Controls Struct
@@ -185,7 +192,13 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
                     }
                 }
 
-                is_swapchain_dirty = engine.draw(&mut binding, render_state, logic_state, dropped_render_states).expect("Failed to tick");
+                is_swapchain_dirty = engine.draw(
+                    &mut binding,
+                    render_state,
+                    logic_state,
+                    #[cfg(debug_assertions)]
+                    dropped_render_states
+                ).expect("Failed to tick");
             }
             
             // Wait for gpu to finish pending work before closing app
@@ -278,6 +291,7 @@ impl Engine {
         binding: &mut Binding<B>, 
         render_state: &mut B::RenderState, 
         logic_state: &mut B::LogicState,
+        #[cfg(debug_assertions)]
         dropped_render_state: &mut Vec<(B::RenderState, usize)>
     ) -> OctaResult<bool> {
         #[cfg(debug_assertions)]
@@ -309,7 +323,8 @@ impl Engine {
         };
         self.in_flight_frames.fence().reset()?;
 
-        
+
+        #[cfg(debug_assertions)]
         if let Binding::HotReload(b) = binding {
             for i in (0..dropped_render_state.len()).rev() {
                 if dropped_render_state[i].1 == image_index {
