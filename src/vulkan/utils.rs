@@ -2,7 +2,7 @@ use std::mem::{align_of, size_of_val};
 
 use anyhow::Result;
 use ash::vk;
-use ash::vk::ImageUsageFlags;
+use ash::vk::{Format, ImageUsageFlags};
 use glam::UVec2;
 use gpu_allocator::MemoryLocation;
 
@@ -104,7 +104,7 @@ impl Context {
     }
 
     pub fn create_texture_image_from_data<T: Copy>(
-        &mut self,
+        &self,
         format: vk::Format,
         image_size: UVec2,
         data: &[T],
@@ -117,8 +117,6 @@ impl Context {
             size,
         )?;
         staging_buffer.copy_data_to_buffer_complex(data, 0, align_of::<T>())?;
-
-
 
         let image = self.create_image(
             ImageUsageFlags::TRANSFER_DST | ImageUsageFlags::SAMPLED,
@@ -159,22 +157,21 @@ impl Context {
     }
 
     pub fn create_live_egui_texture_image(
-        &mut self,
-        format: vk::Format,
+        &self,
+        image_format: vk::Format,
         image_size: UVec2,
-        buffer_size: vk::DeviceSize,
     ) -> Result<(ImageAndView, Buffer)> {
 
         let staging_buffer = self.create_buffer(
             vk::BufferUsageFlags::TRANSFER_SRC,
             MemoryLocation::CpuToGpu,
-            buffer_size,
+            (image_size.element_product() * 4) as _,
         )?;
 
         let image = self.create_image(
             ImageUsageFlags::TRANSFER_DST | ImageUsageFlags::SAMPLED,
             MemoryLocation::GpuOnly,
-            format,
+            image_format,
             image_size.x,
             image_size.y,
         )?;
@@ -197,7 +194,7 @@ impl Context {
     }
 
     pub fn copy_live_egui_texture_staging_buffer_to_image(
-        &mut self,
+        &self,
         staging_buffer: &Buffer,
         image: &Image,
     ) -> Result<()> {

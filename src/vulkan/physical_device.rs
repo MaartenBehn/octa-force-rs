@@ -3,8 +3,9 @@ use std::ffi::CStr;
 
 use anyhow::{bail, Result};
 use ash::{vk};
-use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
+use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceShaderClockFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
 use log::error;
+use notify::event::CreateKind;
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
 use crate::vulkan::instance::Instance;
 
@@ -482,16 +483,22 @@ impl PhysicalDeviceCapabilities {
 }
 
 pub(crate) struct PhysicalDeviceFeatures {
+    pub(crate) features: vk::PhysicalDeviceFeatures,
     pub(crate) ray_tracing_feature: PhysicalDeviceRayTracingPipelineFeaturesKHR,
     pub(crate) acceleration_struct_feature: PhysicalDeviceAccelerationStructureFeaturesKHR,
     pub(crate) features12: PhysicalDeviceVulkan12Features,
     pub(crate) features13: PhysicalDeviceVulkan13Features,
+    pub(crate) clock_feature: PhysicalDeviceShaderClockFeaturesKHR,
 }
 
 impl PhysicalDeviceFeatures {
     pub(crate) fn new(required_device_features: &[String]) -> PhysicalDeviceFeatures {
         let mut required_features: HashSet<_> = required_device_features.iter().collect();
-        let ray_tracing_feature = vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
+        let features = vk::PhysicalDeviceFeatures::builder()
+            .shader_int64(required_features.take(&"int64".to_owned()).is_some())
+            .build();
+
+        let ray_tracing_feature = PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
             .ray_tracing_pipeline(required_features.take(&"rayTracingPipeline".to_owned()).is_some())
             .build();
 
@@ -499,21 +506,26 @@ impl PhysicalDeviceFeatures {
             .acceleration_structure(required_features.take(&"accelerationStructure".to_owned()).is_some())
             .build();
 
-        let features12 = vk::PhysicalDeviceVulkan12Features::builder()
+        let features12 = PhysicalDeviceVulkan12Features::builder()
             .runtime_descriptor_array(required_features.take(&"runtimeDescriptorArray".to_owned()).is_some())
             .buffer_device_address(required_features.take(&"bufferDeviceAddress".to_owned()).is_some())
             .build();
 
-        let features13 = vk::PhysicalDeviceVulkan13Features::builder()
+        let features13 = PhysicalDeviceVulkan13Features::builder()
             .dynamic_rendering(required_features.take(&"dynamicRendering".to_owned()).is_some())
             .synchronization2(required_features.take(&"synchronization2".to_owned()).is_some())
+            .build();
+
+        let clock_feature = PhysicalDeviceShaderClockFeaturesKHR::builder()
+            .shader_device_clock(required_features.take(&"deviceClock".to_owned()).is_some())
+            .shader_subgroup_clock(false)
             .build();
 
         for feature in required_features {
             log::warn!("Device Feature: {feature} not implemented.");
         }
 
-        PhysicalDeviceFeatures {ray_tracing_feature, acceleration_struct_feature, features12, features13}
+        PhysicalDeviceFeatures{features, ray_tracing_feature, acceleration_struct_feature, features12, features13, clock_feature}
     }
 
     pub(crate) fn result(&self, required_device_features: &[String]) -> (bool, HashMap<String, bool>) {
@@ -521,6 +533,11 @@ impl PhysicalDeviceFeatures {
         let mut result = HashMap::new();
         let mut all = true;
 
+        if required_features.take(&"int64".to_owned()).is_some() {
+            let found = self.features.shader_int64 == vk::TRUE;
+            result.insert("int64".to_owned(), found);
+            all &= found;
+        }
         if required_features.take(&"rayTracingPipeline".to_owned()).is_some() {
             let found = self.ray_tracing_feature.ray_tracing_pipeline == vk::TRUE;
             result.insert("rayTracingPipeline".to_owned(), found);
@@ -551,6 +568,11 @@ impl PhysicalDeviceFeatures {
             result.insert("synchronization2".to_owned(), found);
             all &= found;
         }
+        if required_features.take(&"deviceClock".to_owned()).is_some() {
+            let found = self.clock_feature.shader_device_clock == vk::TRUE;
+            result.insert("deviceClock".to_owned(), found);
+            all &= found;
+        }
         
         if !required_features.is_empty() {
             error!("Device Feature Check: {:?}, not implemented!", required_features);
@@ -561,18 +583,27 @@ impl PhysicalDeviceFeatures {
     }
 
     pub(crate) fn vulkan_features(&mut self) -> PhysicalDeviceFeatures2{
-        let mut builder = PhysicalDeviceFeatures2::builder();
-        if self.ray_tracing_feature.ray_tracing_pipeline == vk::TRUE {
-            builder = builder.push_next(&mut self.ray_tracing_feature);
-        }
-        if self.acceleration_struct_feature.acceleration_structure == vk::TRUE {
-            builder = builder.push_next(&mut self.acceleration_struct_feature);
-        }
-        if (self.features12.runtime_descriptor_array | self.features12.runtime_descriptor_array) == vk::TRUE {
+        let mut builder = PhysicalDeviceFeatures2::builder()
+            .features(self.features);
+
+        if (self.features12.runtime_descriptor_array | self.features12.buffer_device_address) == vk::TRUE {
             builder = builder.push_next(&mut self.features12);
         }
+
         if (self.features13.dynamic_rendering | self.features13.synchronization2) == vk::TRUE {
             builder = builder.push_next(&mut self.features13);
+        }
+
+        if (self.clock_feature.shader_device_clock | self.clock_feature.shader_subgroup_clock) == vk::TRUE {
+            builder = builder.push_next(&mut self.clock_feature);
+        }
+
+        if (self.ray_tracing_feature.ray_tracing_pipeline) == vk::TRUE {
+            builder = builder.push_next(&mut self.ray_tracing_feature);
+        }
+
+        if (self.acceleration_struct_feature.acceleration_structure) == vk::TRUE {
+            builder = builder.push_next(&mut self.acceleration_struct_feature);
         }
 
         builder.build()

@@ -87,7 +87,6 @@ impl Context {
             required_extensions.push("VK_KHR_portability_subset".to_owned())
         }
 
-
         #[cfg(debug_assertions)]
         if engine_config.shader_debug_printing == Wanted {
             wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
@@ -99,26 +98,23 @@ impl Context {
         if engine_config.shader_debug_printing == Wanted {
             wanted_extensions.push("VK_KHR_shader_clock".to_owned());
 
-            /*
             wanted_device_features.append(&mut vec![
-                "shaderClock".to_owned(),
+                "deviceClock".to_owned(),
+                "int64".to_owned(),
             ]);
-            
-             */
         } else if engine_config.shader_debug_printing == Needed {
             wanted_extensions.push("VK_KHR_shader_clock".to_owned());
             required_extensions.push("VK_KHR_shader_clock".to_owned());
 
-            /*
             wanted_device_features.append(&mut vec![
-                "shaderClock".to_owned(),
+                "deviceClock".to_owned(),
+                "int64".to_owned(),
             ]);
 
             required_device_features.append(&mut vec![
-                "shaderClock".to_owned(),
+                "deviceClock".to_owned(),
+                "int64".to_owned(),
             ]);
-            
-             */
         };
 
         if engine_config.ray_tracing == Wanted {
@@ -172,7 +168,6 @@ impl Context {
             &physical_device,
             &required_extensions,
             &required_device_features,
-            shader_clock,
         )?);
 
         #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
