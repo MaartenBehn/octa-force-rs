@@ -63,6 +63,7 @@ pub struct EngineConfig {
     pub validation_layers: EngineFeatureValue,
     pub shader_debug_printing: EngineFeatureValue,
     pub shader_debug_clock: EngineFeatureValue,
+    pub GL_EXT_scalar_block_layout: EngineFeatureValue,
 
     pub hot_reload_config: Option<HotReloadConfig>
 }
@@ -310,11 +311,11 @@ impl Engine {
         self.frame_stats.set_gpu_time(gpu_time);
         self.frame_stats.tick();
 
-        let next_image_result = self.swapchain.acquire_next_image(
+        let next_frame_result = self.swapchain.acquire_next_image(
             std::u64::MAX,
             self.in_flight_frames.image_available_semaphore(),
         );
-        let image_index = match next_image_result {
+        let frame_index = match next_frame_result {
             Ok(AcquiredImage { index, .. }) => index as usize,
             Err(err) => match err.downcast_ref::<vk::Result>() {
                 Some(&vk::Result::ERROR_OUT_OF_DATE_KHR) => return Ok(true),
@@ -322,12 +323,14 @@ impl Engine {
             },
         };
         self.in_flight_frames.fence().reset()?;
+        
+        // debug!("Frame Index: {frame_index}", );
 
 
         #[cfg(debug_assertions)]
         if let Binding::HotReload(b) = binding {
             for i in (0..dropped_render_state.len()).rev() {
-                if dropped_render_state[i].1 == image_index {
+                if dropped_render_state[i].1 == frame_index {
                     // Dosen't work 
                     dropped_render_state.remove(i);
                 }
@@ -344,7 +347,7 @@ impl Engine {
                 let mut new_render_state = binding.new_render_state(self)?;
                 mem::swap(render_state, &mut new_render_state);
                 
-                dropped_render_state.push((new_render_state, image_index));
+                dropped_render_state.push((new_render_state, frame_index));
                 
                 debug!("Hot reload done");
             }
@@ -353,13 +356,13 @@ impl Engine {
         {
             #[cfg(debug_assertions)]
             puffin::profile_scope!("update app");
-            binding.update(render_state, logic_state, self, image_index, self.frame_stats.frame_time)?;
+            binding.update(render_state, logic_state, self, frame_index, self.frame_stats.frame_time)?;
         }
 
-        self.record_command_buffer(image_index, binding, render_state, logic_state)?;
+        self.record_command_buffer(frame_index, binding, render_state, logic_state)?;
 
         self.context.graphics_queue.submit(
-            &self.command_buffers[image_index],
+            &self.command_buffers[frame_index],
             Some(SemaphoreSubmitInfo {
                 semaphore: self.in_flight_frames.image_available_semaphore(),
                 stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
@@ -373,7 +376,7 @@ impl Engine {
 
         let signal_semaphores = [self.in_flight_frames.render_finished_semaphore()];
         let present_result = self.swapchain.queue_present(
-            image_index as _,
+            frame_index as _,
             &signal_semaphores,
             &self.context.present_queue,
         );

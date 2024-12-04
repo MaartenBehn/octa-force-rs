@@ -400,11 +400,11 @@ impl PhysicalDeviceCapabilities {
         
         // Depth Formats
         let all_depth_formats = [
-            Format::D32_SFLOAT,
-            Format::D32_SFLOAT_S8_UINT,
+            Format::D24_UNORM_S8_UINT,
             Format::D16_UNORM,
             Format::D16_UNORM_S8_UINT,
-            Format::D24_UNORM_S8_UINT
+            Format::D32_SFLOAT,
+            Format::D32_SFLOAT_S8_UINT,
         ];
 
         let supported_depth_formats = all_depth_formats.into_iter().filter(|format| {

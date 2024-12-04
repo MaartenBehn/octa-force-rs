@@ -21,7 +21,7 @@ impl Gui {
         color_attachment_format: vk::Format,
         depth_attachment_format: vk::Format,
         window: &Window,
-        in_flight_frames: usize,
+        num_frames: usize,
 
     ) -> Result<Self> {
         let egui = EguiContext::default();
@@ -38,7 +38,7 @@ impl Gui {
                 depth_attachment_format: Some(depth_attachment_format),
             },
             Options {
-                in_flight_frames,
+                in_flight_frames: num_frames,
                 ..Default::default()
             },
         )?;
@@ -47,7 +47,7 @@ impl Gui {
             egui,
             egui_winit: platform,
             renderer: gui_renderer,
-            gui_textures_to_free: vec![Vec::new(); in_flight_frames]
+            gui_textures_to_free: vec![Vec::new(); num_frames]
         })
     }
 
@@ -59,13 +59,13 @@ impl Gui {
         &mut self,
         command_buffer: &CommandBuffer,
         size: UVec2,
-        image_index: usize,
+        frame_index: usize,
         window: &Window,
         context: &Context,
         build: F,
     ) -> Result<()> {
-        if !self.gui_textures_to_free[image_index].is_empty() {
-            self.renderer.free_textures(self.gui_textures_to_free[image_index].as_slice())?;
+        if !self.gui_textures_to_free[frame_index].is_empty() {
+            self.renderer.free_textures(self.gui_textures_to_free[frame_index].as_slice())?;
         }
 
         let raw_input =  self.egui_winit.take_egui_input(window);
@@ -81,7 +81,7 @@ impl Gui {
         self.egui_winit.handle_platform_output(window, platform_output);
 
         if !textures_delta.free.is_empty() {
-            self.gui_textures_to_free[image_index] = textures_delta.free;
+            self.gui_textures_to_free[frame_index] = textures_delta.free;
         }
 
         if !textures_delta.set.is_empty() {

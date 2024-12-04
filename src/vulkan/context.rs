@@ -95,14 +95,14 @@ impl Context {
             required_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
         }
         
-        if engine_config.shader_debug_printing == Wanted {
+        if engine_config.shader_debug_clock == Wanted {
             wanted_extensions.push("VK_KHR_shader_clock".to_owned());
 
             wanted_device_features.append(&mut vec![
                 "deviceClock".to_owned(),
                 "int64".to_owned(),
             ]);
-        } else if engine_config.shader_debug_printing == Needed {
+        } else if engine_config.shader_debug_clock == Needed {
             wanted_extensions.push("VK_KHR_shader_clock".to_owned());
             required_extensions.push("VK_KHR_shader_clock".to_owned());
 
@@ -115,6 +115,13 @@ impl Context {
                 "deviceClock".to_owned(),
                 "int64".to_owned(),
             ]);
+        };
+
+        if engine_config.GL_EXT_scalar_block_layout == Wanted {
+            wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
+        } else if engine_config.GL_EXT_scalar_block_layout == Needed {
+            wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
+            required_extensions.push("VK_EXT_scalar_block_layout".to_owned());
         };
 
         if engine_config.ray_tracing == Wanted {
@@ -160,14 +167,33 @@ impl Context {
             surface_formats_with_storage_bit_is_wanted,
         )?;
         
-        let debug_printing = instance.debug_printing && physical_device.wanted_extensions["VK_KHR_shader_non_semantic_info"];
-        let shader_clock = physical_device.wanted_extensions["VK_KHR_shader_clock"];
+        let debug_printing = instance.debug_printing && *physical_device.wanted_extensions.get("VK_KHR_shader_non_semantic_info").unwrap_or(&false);
+        
+        let possible_extensions = physical_device.wanted_extensions.iter().filter_map(|(name, b)| {
+                if *b {
+                    Some(name.to_owned())
+                } else {
+                    None
+                }
+            })
+            .chain(required_extensions.into_iter())
+            .collect();
+
+        let possible_device_features = physical_device.wanted_device_features.iter().filter_map(|(name, b)| {
+                if *b {
+                    Some(name.to_owned())
+                } else {
+                    None
+                }
+            })
+            .chain(required_device_features.into_iter())
+            .collect();
         
         let device = Arc::new(Device::new(
             &instance,
             &physical_device,
-            &required_extensions,
-            &required_device_features,
+            &possible_extensions,
+            &possible_device_features,
         )?);
 
         #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
@@ -192,7 +218,7 @@ impl Context {
             synchronization2.to_owned()
         );
 
-        let ray_tracing = required_extensions.contains(&"VK_KHR_ray_tracing_pipeline".to_owned()).then(|| {
+        let ray_tracing = possible_extensions.contains(&"VK_KHR_ray_tracing_pipeline".to_owned()).then(|| {
             let ray_tracing =
                 Arc::new(RayTracingContext::new(&instance, &physical_device, &device));
             log::debug!(
@@ -232,7 +258,7 @@ impl Context {
                 store_stack_traces: false,
                 log_stack_traces: false,
             },
-            buffer_device_address: required_device_features.contains(&"bufferDeviceAddress".to_owned()),
+            buffer_device_address: possible_device_features.contains(&"bufferDeviceAddress".to_owned()),
             allocation_sizes: Default::default(),
         })?;
 
