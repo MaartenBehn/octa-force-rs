@@ -26,6 +26,7 @@ pub struct Context {
     pub surface: Surface,
     pub instance: Instance,
     pub debug_printing: bool,
+    pub shader_clock: bool,
     _entry: Entry,
 
     #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
@@ -100,7 +101,6 @@ impl Context {
 
             wanted_device_features.append(&mut vec![
                 "deviceClock".to_owned(),
-                "int64".to_owned(),
             ]);
         } else if engine_config.shader_debug_clock == Needed {
             wanted_extensions.push("VK_KHR_shader_clock".to_owned());
@@ -108,12 +108,10 @@ impl Context {
 
             wanted_device_features.append(&mut vec![
                 "deviceClock".to_owned(),
-                "int64".to_owned(),
             ]);
 
             required_device_features.append(&mut vec![
                 "deviceClock".to_owned(),
-                "int64".to_owned(),
             ]);
         };
 
@@ -168,6 +166,8 @@ impl Context {
         )?;
         
         let debug_printing = instance.debug_printing && *physical_device.wanted_extensions.get("VK_KHR_shader_non_semantic_info").unwrap_or(&false);
+        let shader_clock = *physical_device.wanted_device_features.get("deviceClock").unwrap_or(&false)
+            && *physical_device.wanted_extensions.get("VK_KHR_shader_clock").unwrap_or(&false);
         
         let possible_extensions = physical_device.wanted_extensions.iter().filter_map(|(name, b)| {
                 if *b {
@@ -273,6 +273,7 @@ impl Context {
             surface,
             instance,
             debug_printing,
+            shader_clock,
             _entry: entry,
 
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]

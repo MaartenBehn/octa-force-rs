@@ -3,7 +3,7 @@ use std::ffi::CStr;
 
 use anyhow::{bail, Result};
 use ash::{vk};
-use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceShaderClockFeaturesKHR, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
+use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceShaderClockFeaturesKHR, PhysicalDeviceType, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
 use log::error;
 use notify::event::CreateKind;
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
@@ -92,6 +92,21 @@ impl Instance {
                 let mut ok = true;
                 let mut minus_points = 0;
 
+                log::info!(" -- Device Type: {:?}", device_capabilities.device_type);
+                if device_capabilities.device_type == PhysicalDeviceType::VIRTUAL_GPU {
+                    log::info!(" ---- -150 Points");
+                    minus_points -= 150;
+                } else if device_capabilities.device_type == PhysicalDeviceType::CPU {
+                    log::info!(" ---- -100 Points");
+                    minus_points -= 100;
+                } else if device_capabilities.device_type == PhysicalDeviceType::INTEGRATED_GPU {
+                    log::info!(" ---- -50 Points");
+                    minus_points -= 50;
+                } else if device_capabilities.device_type == PhysicalDeviceType::OTHER {
+                    log::info!(" ---- -10 Points");
+                    minus_points -= 10;
+                }
+
                 if !device_capabilities.limits_ok {
                     ok = false;
                     log::info!(" -- Limits not ok");
@@ -163,7 +178,6 @@ impl Instance {
                 }
 
                 if !device_capabilities.wanted_device_features_ok {
-                    ok = false;
                     log::info!(" -- Not all wanted Device Features");
                     for (n, b) in device_capabilities.wanted_device_features.iter() {
                         if !b {
@@ -186,7 +200,7 @@ impl Instance {
         }
         
         devices_capabilities.sort_by(|(c1, minus_points1), (c2, minus_points2)| {
-            minus_points1.cmp(minus_points2).then(c1.limits.max_memory_allocation_count.cmp(&c2.limits.max_memory_allocation_count))
+            minus_points2.cmp(minus_points1).then(c1.limits.max_memory_allocation_count.cmp(&c2.limits.max_memory_allocation_count))
         });
 
         log::info!("Sorted suitable Devices: ");
