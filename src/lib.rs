@@ -21,8 +21,8 @@ use crate::stats::{FrameStats, StatsDisplayMode};
 use ash::vk::{self};
 use controls::Controls;
 use glam::UVec2;
-use std::{thread, time::{Duration, Instant}};
-use log::{debug, info};
+use std::{env, thread, time::{Duration, Instant}};
+use log::{debug, error, info, trace};
 use vulkan::*;
 use winit::{
     dpi::PhysicalSize,
@@ -85,9 +85,27 @@ pub struct Engine {
     pub context: Context,
 }
 
-pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
-    log_init()?;
-    
+pub fn run<B: BindingTrait>(engine_config: EngineConfig) { 
+    unsafe {
+        env::set_var("RUST_BACKTRACE", "1");
+    }
+
+    let res = log_init();
+    if res.is_err() {
+        let err = res.unwrap_err();
+        println!("{}", err);
+    }
+
+    let res = run_iternal::<B>(engine_config);
+
+    if res.is_err() {
+        let err = res.unwrap_err();
+        error!("{}", err.to_string());
+        trace!("{}", err.backtrace());
+    }
+}
+
+fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> { 
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
     
@@ -213,7 +231,7 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
             _ => (),
         }
     })?;
-    
+
     Ok(())
 }
 
