@@ -5,9 +5,8 @@ use gpu_allocator::{
     vulkan::{Allocator, AllocatorCreateDesc},
     AllocatorDebugSettings,
 };
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
-use crate::{vulkan::device::{Device}, vulkan::instance::Instance, vulkan::queue::Queue, vulkan::surface::Surface, CommandBuffer, CommandPool, RayTracingContext, EngineConfig, EngineFeatureValue};
-use crate::EngineFeatureValue::{Needed, Wanted};
+use raw_window_handle::{HasDisplayHandle, HasRawDisplayHandle, HasRawWindowHandle, HasWindowHandle};
+use crate::{engine::EngineFeatureValue, vulkan::{device::Device, instance::Instance, queue::Queue, surface::Surface}, CommandBuffer, CommandPool, EngineConfig, RayTracingContext};
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::extensions::khr::{DynamicRendering, Synchronization2};
@@ -37,8 +36,8 @@ pub struct Context {
 }
 impl Context {
     pub fn new<'a>(
-        window_handle: &'a dyn HasRawWindowHandle,
-        display_handle: &'a dyn HasRawDisplayHandle,
+        window_handle: &'a dyn HasWindowHandle,
+        display_handle: &'a dyn HasDisplayHandle,
         engine_config: &EngineConfig
     ) -> Result<Self> {
 
@@ -89,20 +88,20 @@ impl Context {
         }
 
         #[cfg(debug_assertions)]
-        if engine_config.shader_debug_printing == Wanted {
+        if engine_config.shader_debug_printing == EngineFeatureValue::Wanted {
             wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
-        } else if engine_config.shader_debug_printing == Needed {
+        } else if engine_config.shader_debug_printing == EngineFeatureValue::Needed {
             wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
             required_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
         }
         
-        if engine_config.shader_debug_clock == Wanted {
+        if engine_config.shader_debug_clock == EngineFeatureValue::Wanted {
             wanted_extensions.push("VK_KHR_shader_clock".to_owned());
 
             wanted_device_features.append(&mut vec![
                 "deviceClock".to_owned(),
             ]);
-        } else if engine_config.shader_debug_clock == Needed {
+        } else if engine_config.shader_debug_clock == EngineFeatureValue::Needed {
             wanted_extensions.push("VK_KHR_shader_clock".to_owned());
             required_extensions.push("VK_KHR_shader_clock".to_owned());
 
@@ -115,14 +114,14 @@ impl Context {
             ]);
         };
 
-        if engine_config.GL_EXT_scalar_block_layout == Wanted {
+        if engine_config.GL_EXT_scalar_block_layout == EngineFeatureValue::Wanted {
             wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
-        } else if engine_config.GL_EXT_scalar_block_layout == Needed {
+        } else if engine_config.GL_EXT_scalar_block_layout == EngineFeatureValue::Needed {
             wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
             required_extensions.push("VK_EXT_scalar_block_layout".to_owned());
         };
 
-        if engine_config.ray_tracing == Wanted {
+        if engine_config.ray_tracing == EngineFeatureValue::Wanted {
             required_extensions.append(&mut vec![
                 "VK_KHR_ray_tracing_pipeline".to_owned(),
                 "VK_KHR_acceleration_structure".to_owned(),
@@ -135,7 +134,7 @@ impl Context {
                 "runtimeDescriptorArray".to_owned(),
                 "bufferDeviceAddress".to_owned(),
             ]);
-        } else if engine_config.ray_tracing == Needed {
+        } else if engine_config.ray_tracing == EngineFeatureValue::Needed {
             wanted_extensions.append(&mut vec![
                 "VK_KHR_ray_tracing_pipeline".to_owned(),
                 "VK_KHR_acceleration_structure".to_owned(),

@@ -6,8 +6,9 @@ use ash::vk::{Format, ImageUsageFlags};
 use glam::UVec2;
 use gpu_allocator::MemoryLocation;
 
+use crate::engine::ImageAndView;
 use crate::vulkan::{CommandBuffer, Image, ImageBarrier};
-use crate::{Buffer, Context, ImageAndView};
+use crate::{Buffer, Context};
 
 pub fn compute_aligned_size(size: u32, alignment: u32) -> u32 {
     (size + (alignment - 1)) & !(alignment - 1)

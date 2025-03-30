@@ -34,7 +34,7 @@ pub struct PhysicalDevice {
 
 
 #[derive(Debug, Clone)]
-#[allow(unused)]
+//#[allow(unused)]
 pub struct PhysicalDeviceCapabilities {
     pub inner: vk::PhysicalDevice,
     pub name: String,
@@ -496,44 +496,38 @@ impl PhysicalDeviceCapabilities {
     }
 }
 
-pub(crate) struct PhysicalDeviceFeatures {
+pub(crate) struct PhysicalDeviceFeatures<'a> {
     pub(crate) features: vk::PhysicalDeviceFeatures,
-    pub(crate) ray_tracing_feature: PhysicalDeviceRayTracingPipelineFeaturesKHR,
-    pub(crate) acceleration_struct_feature: PhysicalDeviceAccelerationStructureFeaturesKHR,
-    pub(crate) features12: PhysicalDeviceVulkan12Features,
-    pub(crate) features13: PhysicalDeviceVulkan13Features,
-    pub(crate) clock_feature: PhysicalDeviceShaderClockFeaturesKHR,
+    pub(crate) ray_tracing_feature: PhysicalDeviceRayTracingPipelineFeaturesKHR<'a>,
+    pub(crate) acceleration_struct_feature: PhysicalDeviceAccelerationStructureFeaturesKHR<'a>,
+    pub(crate) features12: PhysicalDeviceVulkan12Features<'a>,
+    pub(crate) features13: PhysicalDeviceVulkan13Features<'a>,
+    pub(crate) clock_feature: PhysicalDeviceShaderClockFeaturesKHR<'a>,
 }
 
-impl PhysicalDeviceFeatures {
+impl<'a> PhysicalDeviceFeatures<'a> {
     pub(crate) fn new(required_device_features: &[String]) -> PhysicalDeviceFeatures {
         let mut required_features: HashSet<_> = required_device_features.iter().collect();
-        let features = vk::PhysicalDeviceFeatures::builder()
-            .shader_int64(required_features.take(&"int64".to_owned()).is_some())
-            .build();
+        let features = vk::PhysicalDeviceFeatures::default()
+            .shader_int64(required_features.take(&"int64".to_owned()).is_some());
 
-        let ray_tracing_feature = PhysicalDeviceRayTracingPipelineFeaturesKHR::builder()
-            .ray_tracing_pipeline(required_features.take(&"rayTracingPipeline".to_owned()).is_some())
-            .build();
+        let ray_tracing_feature = PhysicalDeviceRayTracingPipelineFeaturesKHR::default()
+            .ray_tracing_pipeline(required_features.take(&"rayTracingPipeline".to_owned()).is_some());
 
-        let acceleration_struct_feature = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::builder()
-            .acceleration_structure(required_features.take(&"accelerationStructure".to_owned()).is_some())
-            .build();
+        let acceleration_struct_feature = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default()
+            .acceleration_structure(required_features.take(&"accelerationStructure".to_owned()).is_some());
 
-        let features12 = PhysicalDeviceVulkan12Features::builder()
+        let features12 = PhysicalDeviceVulkan12Features::default()
             .runtime_descriptor_array(required_features.take(&"runtimeDescriptorArray".to_owned()).is_some())
-            .buffer_device_address(required_features.take(&"bufferDeviceAddress".to_owned()).is_some())
-            .build();
+            .buffer_device_address(required_features.take(&"bufferDeviceAddress".to_owned()).is_some());
 
-        let features13 = PhysicalDeviceVulkan13Features::builder()
+        let features13 = PhysicalDeviceVulkan13Features::default()
             .dynamic_rendering(required_features.take(&"dynamicRendering".to_owned()).is_some())
-            .synchronization2(required_features.take(&"synchronization2".to_owned()).is_some())
-            .build();
+            .synchronization2(required_features.take(&"synchronization2".to_owned()).is_some());
 
-        let clock_feature = PhysicalDeviceShaderClockFeaturesKHR::builder()
+        let clock_feature = PhysicalDeviceShaderClockFeaturesKHR::default()
             .shader_device_clock(required_features.take(&"deviceClock".to_owned()).is_some())
-            .shader_subgroup_clock(false)
-            .build();
+            .shader_subgroup_clock(false);
 
         for feature in required_features {
             log::warn!("Device Feature: {feature} not implemented.");
@@ -597,7 +591,7 @@ impl PhysicalDeviceFeatures {
     }
 
     pub(crate) fn vulkan_features(&mut self) -> PhysicalDeviceFeatures2{
-        let mut builder = PhysicalDeviceFeatures2::builder()
+        let mut builder = PhysicalDeviceFeatures2::default()
             .features(self.features);
 
         if (self.features12.runtime_descriptor_array | self.features12.buffer_device_address) == vk::TRUE {
@@ -620,7 +614,7 @@ impl PhysicalDeviceFeatures {
             builder = builder.push_next(&mut self.acceleration_struct_feature);
         }
 
-        builder.build()
+        builder
     }
 }
 

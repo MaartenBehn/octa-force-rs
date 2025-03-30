@@ -6,12 +6,12 @@ use crate::{Engine, OctaResult};
 pub trait BindingTrait {
     type RenderState;
     type LogicState;
-    fn new_render_state(engine: &mut Engine) -> OctaResult<Self::RenderState>;
-    fn new_logic_state(render_state: &mut Self::RenderState, engine: &mut Engine) -> OctaResult<Self::LogicState>;
+    fn new_logic_state() -> OctaResult<Self::LogicState>;
+    fn new_render_state(logic_state: &mut Self::LogicState, engine: &mut Engine) -> OctaResult<Self::RenderState>;
 
     fn update(
-        render_state: &mut Self::RenderState,
         logic_state: &mut Self::LogicState,
+        render_state: &mut Self::RenderState,
         engine: &mut Engine,
         image_index: usize,
         delta_time: Duration,
@@ -27,8 +27,8 @@ pub trait BindingTrait {
     }
 
     fn record_render_commands(
-        render_state: &mut Self::RenderState,
         logic_state: &mut Self::LogicState,
+        render_state: &mut Self::RenderState,
         engine: &mut Engine,
         image_index: usize,
     ) -> OctaResult<()> {
@@ -52,8 +52,8 @@ pub trait BindingTrait {
     }
 
     fn on_window_event(
-        render_state: &mut Self::RenderState,
         logic_state: &mut Self::LogicState,
+        render_state: &mut Self::RenderState,
         engine: &mut Engine,
         event: &WindowEvent
     ) -> OctaResult<()> {
@@ -67,8 +67,8 @@ pub trait BindingTrait {
     }
 
     fn on_recreate_swapchain(
-        render_state: &mut Self::RenderState,
         logic_state: &mut Self::LogicState,
+        render_state: &mut Self::RenderState,
         engine: &mut Engine,
     ) -> OctaResult<()> {
         // prevents reports of unused parameters without needing to use #[allow]

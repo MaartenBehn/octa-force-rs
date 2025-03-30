@@ -15,7 +15,7 @@ impl DescriptorSetLayout {
         device: Arc<Device>,
         bindings: &[vk::DescriptorSetLayoutBinding],
     ) -> Result<Self> {
-        let dsl_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(bindings);
+        let dsl_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(bindings);
         let inner = unsafe { device.inner.create_descriptor_set_layout(&dsl_info, None)? };
 
         Ok(Self { device, inner })
@@ -43,7 +43,7 @@ impl DescriptorPool {
         max_sets: u32,
         pool_sizes: &[vk::DescriptorPoolSize],
     ) -> Result<Self> {
-        let pool_info = vk::DescriptorPoolCreateInfo::builder()
+        let pool_info = vk::DescriptorPoolCreateInfo::default()
             .max_sets(max_sets)
             .pool_sizes(pool_sizes);
         let inner = unsafe { device.inner.create_descriptor_pool(&pool_info, None)? };
@@ -57,7 +57,7 @@ impl DescriptorPool {
         count: u32,
     ) -> Result<Vec<DescriptorSet>> {
         let layouts = (0..count).map(|_| layout.inner).collect::<Vec<_>>();
-        let sets_alloc_info = vk::DescriptorSetAllocateInfo::builder()
+        let sets_alloc_info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(self.inner)
             .set_layouts(&layouts);
         let sets = unsafe {
@@ -105,85 +105,78 @@ impl DescriptorSet {
             .iter()
             .map(|write| match write.kind {
                 StorageImage { view, layout } => {
-                    let img_info = vk::DescriptorImageInfo::builder()
+                    let img_info = vk::DescriptorImageInfo::default()
                         .image_view(view.inner)
                         .image_layout(layout);
 
                     img_infos.push(img_info);
 
-                    vk::WriteDescriptorSet::builder()
+                    vk::WriteDescriptorSet::default()
                         .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
                         .dst_binding(write.binding)
                         .dst_set(self.inner)
                         .image_info(std::slice::from_ref(img_infos.last().unwrap()))
-                        .build()
                 }
                 AccelerationStructure {
                     acceleration_structure,
                 } => {
-                    let write_set_as = vk::WriteDescriptorSetAccelerationStructureKHR::builder()
+                    let write_set_as = vk::WriteDescriptorSetAccelerationStructureKHR::default()
                         .acceleration_structures(std::slice::from_ref(
                             &acceleration_structure.inner,
                         ));
 
                     as_infos.push(write_set_as);
 
-                    let mut write = vk::WriteDescriptorSet::builder()
+                    vk::WriteDescriptorSet::default()
                         .descriptor_type(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR)
                         .dst_binding(write.binding)
                         .dst_set(self.inner)
-                        .push_next(as_infos.last_mut().unwrap())
-                        .build();
-                    write.descriptor_count = 1;
-
-                    write
+                        .descriptor_count(1)
+                        //.push_next(as_infos.last_mut().unwrap())
                 }
                 UniformBuffer { buffer } => {
-                    let buffer_info = vk::DescriptorBufferInfo::builder()
+                    let buffer_info = vk::DescriptorBufferInfo::default()
                         .buffer(buffer.inner)
                         .range(vk::WHOLE_SIZE);
 
                     buffer_infos.push(buffer_info);
 
-                    vk::WriteDescriptorSet::builder()
+                    vk::WriteDescriptorSet::default()
                         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                         .dst_binding(write.binding)
                         .dst_set(self.inner)
                         .buffer_info(std::slice::from_ref(buffer_infos.last().unwrap()))
-                        .build()
                 }
                 StorageBuffer { buffer } => {
-                    let buffer_info = vk::DescriptorBufferInfo::builder()
+                    let buffer_info = vk::DescriptorBufferInfo::default()
                         .buffer(buffer.inner)
                         .range(vk::WHOLE_SIZE);
 
                     buffer_infos.push(buffer_info);
 
-                    vk::WriteDescriptorSet::builder()
+                    vk::WriteDescriptorSet::default()
                         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                         .dst_binding(write.binding)
                         .dst_set(self.inner)
                         .buffer_info(std::slice::from_ref(buffer_infos.last().unwrap()))
-                        .build()
                 }
                 CombinedImageSampler {
                     view,
                     sampler,
                     layout,
                 } => {
-                    let img_info = vk::DescriptorImageInfo::builder()
+                    let img_info = vk::DescriptorImageInfo::default()
                         .image_view(view.inner)
                         .sampler(sampler.inner)
                         .image_layout(layout);
 
                     img_infos.push(img_info);
 
-                    vk::WriteDescriptorSet::builder()
+                    vk::WriteDescriptorSet::default()
                         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                         .dst_binding(write.binding)
                         .dst_set(self.inner)
                         .image_info(std::slice::from_ref(img_infos.last().unwrap()))
-                        .build()
                 }
             })
             .collect::<Vec<_>>();

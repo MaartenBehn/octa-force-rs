@@ -1,4 +1,3 @@
-use crate::Queue;
 use std::time::Duration;
 use egui::Align2;
 #[cfg(debug_assertions)]
@@ -169,4 +168,20 @@ fn build_frametime_plot(ui: &mut egui::Ui, id: impl std::hash::Hash, points: &[f
         .show(ui, |plot| {
             plot.line(egui_plot::Line::new(points));
         });
+}
+
+#[derive(Debug)]
+struct Queue<T>(Vec<T>, usize);
+
+impl<T> Queue<T> {
+    fn new(max_size: usize) -> Self {
+        Self(Vec::with_capacity(max_size), max_size)
+    }
+
+    fn push(&mut self, value: T) {
+        if self.0.len() == self.1 {
+            self.0.remove(0);
+        }
+        self.0.push(value);
+    }
 }

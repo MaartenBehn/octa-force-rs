@@ -3,7 +3,8 @@ use ash::Entry;
 fn main() {
     let entry = Entry::linked();
 
-    let res = entry.try_enumerate_instance_version();
+
+    let res = unsafe { entry.try_enumerate_instance_version() };
     if res.is_err() {
         println!("cargo::rustc-cfg=vulkan_1_0");
     }

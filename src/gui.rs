@@ -28,7 +28,7 @@ impl Gui {
         let pixels_per_point = 1.0 / window.scale_factor() as f32;
         egui.set_pixels_per_point(pixels_per_point);
 
-        let platform = EguiWinit::new(egui.clone(), ViewportId::ROOT, &window, Some(pixels_per_point), None);
+        let platform = EguiWinit::new(egui.clone(), ViewportId::ROOT, &window, Some(pixels_per_point), None, None);
 
         let gui_renderer = Renderer::with_gpu_allocator(
             context.allocator.clone(),
@@ -55,7 +55,7 @@ impl Gui {
         let _ = self.egui_winit.on_window_event(window, event);
     }
 
-    pub fn cmd_draw<F: FnOnce(&egui::Context)>(
+    pub fn cmd_draw<F: FnMut(&egui::Context)>(
         &mut self,
         command_buffer: &CommandBuffer,
         size: UVec2,

@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
-use ash::extensions::khr::{DynamicRendering, Synchronization2};
+use ash::khr::{DynamicRendering, Synchronization2};
 
 pub struct CommandPool {
     device: Arc<Device>,
@@ -39,7 +39,7 @@ impl CommandPool {
     ) -> Result<Self> {
         let flags = flags.unwrap_or_else(vk::CommandPoolCreateFlags::empty);
 
-        let command_pool_info = vk::CommandPoolCreateInfo::builder()
+        let command_pool_info = vk::CommandPoolCreateInfo::default()
             .queue_family_index(queue_family.index)
             .flags(flags);
         let inner = unsafe { device.inner.create_command_pool(&command_pool_info, None)? };
@@ -62,7 +62,7 @@ impl CommandPool {
         level: vk::CommandBufferLevel,
         count: u32,
     ) -> Result<Vec<CommandBuffer>> {
-        let allocate_info = vk::CommandBufferAllocateInfo::builder()
+        let allocate_info = vk::CommandBufferAllocateInfo::default()
             .command_pool(self.inner)
             .level(level)
             .command_buffer_count(count);
@@ -151,7 +151,7 @@ pub struct CommandBuffer {
 
 impl CommandBuffer {
     pub fn begin(&self, flags: Option<vk::CommandBufferUsageFlags>) -> Result<()> {
-        let begin_info = vk::CommandBufferBeginInfo::builder()
+        let begin_info = vk::CommandBufferBeginInfo::default()
             .flags(flags.unwrap_or(vk::CommandBufferUsageFlags::empty()));
         unsafe {
             self.device
@@ -307,7 +307,7 @@ impl CommandBuffer {
         let barriers = barriers
             .iter()
             .map(|b| {
-                vk::BufferMemoryBarrier2::builder()
+                vk::BufferMemoryBarrier2::default()
                     .src_stage_mask(b.src_stage_mask)
                     .src_access_mask(b.src_access_mask)
                     .dst_stage_mask(b.dst_stage_mask)
@@ -315,11 +315,10 @@ impl CommandBuffer {
                     .buffer(b.buffer.inner)
                     .offset(0)
                     .size(vk::WHOLE_SIZE)
-                    .build()
             })
             .collect::<Vec<_>>();
 
-        let dependency_info = vk::DependencyInfo::builder().buffer_memory_barriers(&barriers);
+        let dependency_info = vk::DependencyInfo::default().buffer_memory_barriers(&barriers);
 
         unsafe {
             self.device
@@ -332,16 +331,15 @@ impl CommandBuffer {
         let barriers = barriers
             .iter()
             .map(|b| {
-                vk::MemoryBarrier2::builder()
+                vk::MemoryBarrier2::default()
                     .src_stage_mask(b.src_stage_mask)
                     .src_access_mask(b.src_access_mask)
                     .dst_stage_mask(b.dst_stage_mask)
                     .dst_access_mask(b.dst_access_mask)
-                    .build()
             })
             .collect::<Vec<_>>();
 
-        let dependency_info = vk::DependencyInfo::builder().memory_barriers(&barriers);
+        let dependency_info = vk::DependencyInfo::default().memory_barriers(&barriers);
 
         unsafe {
             self.device
@@ -352,7 +350,7 @@ impl CommandBuffer {
 
     pub fn copy_buffer(&self, src_buffer: &Buffer, dst_buffer: &Buffer) {
         unsafe {
-            let region = vk::BufferCopy::builder().size(src_buffer.size);
+            let region = vk::BufferCopy::default().size(src_buffer.size);
             self.device.inner.cmd_copy_buffer(
                 self.inner,
                 src_buffer.inner,
@@ -366,7 +364,7 @@ impl CommandBuffer {
         let barriers = barriers
             .iter()
             .map(|b| {
-                vk::ImageMemoryBarrier2::builder()
+                vk::ImageMemoryBarrier2::default()
                     .src_stage_mask(b.src_stage_mask)
                     .src_access_mask(b.src_access_mask)
                     .old_layout(b.old_layout)
@@ -381,11 +379,10 @@ impl CommandBuffer {
                         base_array_layer: 0,
                         layer_count: 1,
                     })
-                    .build()
             })
             .collect::<Vec<_>>();
 
-        let dependency_info = vk::DependencyInfo::builder().image_memory_barriers(&barriers);
+        let dependency_info = vk::DependencyInfo::default().image_memory_barriers(&barriers);
 
         unsafe {
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
@@ -406,7 +403,7 @@ impl CommandBuffer {
         dst_image: &Image,
         dst_layout: vk::ImageLayout,
     ) {
-        let region = vk::ImageCopy::builder()
+        let region = vk::ImageCopy::default()
             .src_subresource(vk::ImageSubresourceLayers {
                 aspect_mask: vk::ImageAspectFlags::COLOR,
                 base_array_layer: 0,
@@ -438,7 +435,7 @@ impl CommandBuffer {
     }
 
     pub fn copy_buffer_to_image(&self, src: &Buffer, dst: &Image, layout: vk::ImageLayout) {
-        let region = vk::BufferImageCopy::builder()
+        let region = vk::BufferImageCopy::default()
             .image_subresource(vk::ImageSubresourceLayers {
                 aspect_mask: vk::ImageAspectFlags::COLOR,
                 mip_level: 0,
@@ -469,7 +466,7 @@ impl CommandBuffer {
 
         unsafe {
             ray_tracing
-                .acceleration_structure_fn
+                .acceleration_structure
                 .cmd_build_acceleration_structures(
                     self.inner,
                     std::slice::from_ref(as_build_geo_info),
@@ -485,12 +482,12 @@ impl CommandBuffer {
             .expect("Cannot call CommandBuffer::trace_rays when ray tracing is not enabled");
 
         unsafe {
-            ray_tracing.pipeline_fn.cmd_trace_rays(
+            ray_tracing.pipeline.cmd_trace_rays(
                 self.inner,
                 &shader_binding_table.raygen_region,
                 &shader_binding_table.miss_region,
                 &shader_binding_table.hit_region,
-                &vk::StridedDeviceAddressRegionKHR::builder(),
+                &vk::StridedDeviceAddressRegionKHR::default(),
                 width,
                 height,
                 1,
@@ -506,7 +503,7 @@ impl CommandBuffer {
         load_op: vk::AttachmentLoadOp,
         clear_color: Option<[f32; 4]>,
     ) {
-        let color_attachment_info = vk::RenderingAttachmentInfo::builder()
+        let color_attachment_info = vk::RenderingAttachmentInfo::default()
             .image_view(image_view.inner)
             .image_layout(vk::ImageLayout::ATTACHMENT_OPTIMAL)
             .load_op(load_op)
@@ -517,7 +514,7 @@ impl CommandBuffer {
                 },
             });
 
-        let mut rendering_info = vk::RenderingInfo::builder()
+        let mut rendering_info = vk::RenderingInfo::default()
             .render_area(vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: Extent2D{ width: size.x, height: size.y },
@@ -525,7 +522,7 @@ impl CommandBuffer {
             .layer_count(1)
             .color_attachments(std::slice::from_ref(&color_attachment_info));
 
-        let depth_attachment_info = vk::RenderingAttachmentInfo::builder()
+        let depth_attachment_info = vk::RenderingAttachmentInfo::default()
             .image_view(depth_view.inner)
             .image_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
             .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -616,7 +613,7 @@ impl CommandBuffer {
         pool: &TimestampQueryPool<C>,
         query_index: u32,
     ) {
-        assert!(query_index < C as _, "Query index must be < {C}");
+        assert!(query_index < C as u32, "Query index must be < {C}");
 
         unsafe {
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]

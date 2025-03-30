@@ -23,7 +23,7 @@ impl ShaderBindingTable {
         // Handle size & aligment
         let handle_size = ray_tracing.pipeline_properties.shader_group_handle_size;
         let handle_alignment = ray_tracing
-            .pipeline_properties
+            .pipeline
             .shader_group_handle_alignment;
         let aligned_handle_size = compute_aligned_size(handle_size, handle_alignment);
         let handle_pad = aligned_handle_size - handle_size;
@@ -34,7 +34,7 @@ impl ShaderBindingTable {
         let data_size = desc.group_count * handle_size;
         let handles = unsafe {
             ray_tracing
-                .pipeline_fn
+                .pipeline
                 .get_ray_tracing_shader_group_handles(
                     pipeline.inner,
                     0,
@@ -104,23 +104,20 @@ impl ShaderBindingTable {
         let address = buffer.get_device_address();
 
         // see https://nvpro-samples.github.io/vk_raytracing_tutorial_KHR/Images/sbt_0.png
-        let raygen_region = vk::StridedDeviceAddressRegionKHR::builder()
+        let raygen_region = vk::StridedDeviceAddressRegionKHR::default()
             .device_address(address)
             .size(raygen_region_size as _)
-            .stride(raygen_region_size as _)
-            .build();
+            .stride(raygen_region_size as _);
 
-        let miss_region = vk::StridedDeviceAddressRegionKHR::builder()
+        let miss_region = vk::StridedDeviceAddressRegionKHR::default()
             .device_address(address + raygen_region.size)
             .size(miss_region_size as _)
-            .stride(aligned_handle_size as _)
-            .build();
+            .stride(aligned_handle_size as _);
 
-        let hit_region = vk::StridedDeviceAddressRegionKHR::builder()
+        let hit_region = vk::StridedDeviceAddressRegionKHR::default()
             .device_address(address + raygen_region.size + miss_region.size)
             .size(hit_region_size as _)
-            .stride(aligned_handle_size as _)
-            .build();
+            .stride(aligned_handle_size as _);
 
         Ok(Self {
             _buffer: buffer,

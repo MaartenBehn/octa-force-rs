@@ -7,9 +7,9 @@ pub use pipeline::*;
 pub use shader_binding_table::*;
 
 use ash::{
-    extensions::khr::{
-        AccelerationStructure as AshAccelerationStructure,
-        RayTracingPipeline as AshRayTracingPipeline,
+    khr::{
+        acceleration_structure::Device as AshAccelerationStructure,
+        ray_tracing_pipeline::Device as AshRayTracingPipeline,
     },
     vk,
 };
@@ -19,14 +19,12 @@ use crate::{
 };
 use crate::vulkan::physical_device::PhysicalDevice;
 
-pub struct RayTracingContext {
-    pub pipeline_properties: vk::PhysicalDeviceRayTracingPipelinePropertiesKHR,
-    pub pipeline_fn: AshRayTracingPipeline,
-    pub acceleration_structure_properties: vk::PhysicalDeviceAccelerationStructurePropertiesKHR,
-    pub acceleration_structure_fn: AshAccelerationStructure,
+pub struct RayTracingContext<'a> {
+    pub pipeline: AshRayTracingPipeline,
+    pub acceleration_structure: AshAccelerationStructure,
 }
 
-impl RayTracingContext {
+impl<'a> RayTracingContext<'a> {
     pub(crate) fn new(instance: &Instance, pdevice: &PhysicalDevice, device: &Device) -> Self {
         let pipeline_properties =
             unsafe { AshRayTracingPipeline::get_properties(&instance.inner, pdevice.inner) };
@@ -39,9 +37,9 @@ impl RayTracingContext {
 
         Self {
             pipeline_properties,
-            pipeline_fn,
+            pipeline: pipeline_fn,
             acceleration_structure_properties,
-            acceleration_structure_fn,
+            acceleration_structure: acceleration_structure_fn,
         }
     }
 }

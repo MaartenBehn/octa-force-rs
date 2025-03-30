@@ -52,7 +52,7 @@ impl<B: BindingTrait> Binding<B> {
         Ok(())
     }
     
-    pub fn new_render_state(&self, engine: &mut Engine) -> OctaResult<B::RenderState> {
+    pub fn new_render_state(&self, logic_state: &mut B::LogicState, engine: &mut Engine) -> OctaResult<B::RenderState> {
         #[cfg(not(debug_assertions))]
         return B::new_render_state(engine);
 
@@ -61,21 +61,21 @@ impl<B: BindingTrait> Binding<B> {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern fn(&mut Engine) -> OctaResult<B::RenderState>> =
+                        let call: Symbol<unsafe extern fn(&mut B::LogicState, &mut Engine) -> OctaResult<B::RenderState>> =
                             b.lib_reloader.get_symbol("new_render_state")?;
-                        call(engine)
+                        call(logic_state, engine)
                     }
                 } else {
-                    B::new_render_state(engine)
+                    B::new_render_state(logic_state, engine)
                 }
             }
             Binding::Static(_) => {
-                B::new_render_state(engine)
+                B::new_render_state(logic_state, engine)
             }
         }
     }
 
-    pub fn new_logic_state(&self, render_state: &mut B::RenderState, engine: &mut Engine) -> OctaResult<B::LogicState> {
+    pub fn new_logic_state(&self) -> OctaResult<B::LogicState> {
         #[cfg(not(debug_assertions))]
         return B::new_logic_state(render_state, engine);
 
@@ -84,16 +84,16 @@ impl<B: BindingTrait> Binding<B> {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut Engine) -> OctaResult<B::LogicState>> =
+                        let call: Symbol<unsafe extern fn() -> OctaResult<B::LogicState>> =
                             b.lib_reloader.get_symbol("new_logic_state")?;
-                        call(render_state, engine)
+                        call()
                     }
                 } else {
-                    B::new_logic_state(render_state, engine)
+                    B::new_logic_state()
                 }
             }
             Binding::Static(_) => {
-                B::new_logic_state(render_state, engine)
+                B::new_logic_state()
             }
         }
     }
@@ -114,16 +114,16 @@ impl<B: BindingTrait> Binding<B> {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, usize, Duration) -> OctaResult<()>> =
+                        let call: Symbol<unsafe extern fn(&mut B::LogicState, &mut B::RenderState, &mut Engine, usize, Duration) -> OctaResult<()>> =
                             b.lib_reloader.get_symbol("update")?;
-                        call(render_state, logic_state, engine, image_index, delta_time)
+                        call(logic_state, render_state, engine, image_index, delta_time)
                     }
                 } else {
-                    B::update(render_state, logic_state, engine, image_index, delta_time)
+                    B::update(logic_state, render_state,  engine, image_index, delta_time)
                 }
             }
             Binding::Static(_) => {
-                B::update(render_state, logic_state, engine, image_index, delta_time)
+                B::update(logic_state, render_state,  engine, image_index, delta_time)
             }
         }
     }
@@ -143,16 +143,16 @@ impl<B: BindingTrait> Binding<B> {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, usize) -> OctaResult<()>> =
+                        let call: Symbol<unsafe extern fn(&mut B::LogicState, &mut B::RenderState, &mut Engine, usize) -> OctaResult<()>> =
                             b.lib_reloader.get_symbol("record_render_commands")?;
-                        call(render_state, logic_state, engine, image_index)
+                        call(logic_state, render_state, engine, image_index)
                     }
                 } else {
-                    B::record_render_commands(render_state, logic_state, engine, image_index)
+                    B::record_render_commands(logic_state, render_state, engine, image_index)
                 }
             }
             Binding::Static(_) => {
-                B::record_render_commands(render_state, logic_state, engine, image_index)
+                B::record_render_commands(logic_state, render_state, engine, image_index)
             }
         }
     }
@@ -172,16 +172,16 @@ impl<B: BindingTrait> Binding<B> {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine, &WindowEvent) -> OctaResult<()>> =
+                        let call: Symbol<unsafe extern fn(&mut B::LogicState, &mut B::RenderState, &mut Engine, &WindowEvent) -> OctaResult<()>> =
                             b.lib_reloader.get_symbol("on_window_event")?;
-                        call(render_state, logic_state, engine, event)
+                        call(logic_state, render_state, engine, event)
                     }
                 } else {
-                    B::on_window_event(render_state, logic_state, engine, event)
+                    B::on_window_event(logic_state, render_state, engine, event)
                 }
             }
             Binding::Static(_) => {
-                B::on_window_event(render_state, logic_state, engine, event)
+                B::on_window_event(logic_state, render_state, engine, event)
             }
         }
     }
@@ -200,16 +200,16 @@ impl<B: BindingTrait> Binding<B> {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern fn(&mut B::RenderState, &mut B::LogicState, &mut Engine) -> OctaResult<()>> =
+                        let call: Symbol<unsafe extern fn(&mut B::LogicState, &mut B::RenderState, &mut Engine) -> OctaResult<()>> =
                             b.lib_reloader.get_symbol("on_recreate_swapchain")?;
-                        call(render_state, logic_state, engine)
+                        call( logic_state, render_state, engine)
                     }
                 } else {
-                    B::on_recreate_swapchain(render_state, logic_state, engine)
+                    B::on_recreate_swapchain(logic_state, render_state, engine)
                 }
             }
             Binding::Static(_) => {
-                B::on_recreate_swapchain(render_state, logic_state, engine)
+                B::on_recreate_swapchain(logic_state, render_state, engine)
             }
         }
     }

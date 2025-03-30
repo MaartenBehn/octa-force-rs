@@ -21,7 +21,7 @@ impl PipelineLayout {
             .map(|l| l.inner)
             .collect::<Vec<_>>();
 
-        let pipe_layout_info = vk::PipelineLayoutCreateInfo::builder()
+        let pipe_layout_info = vk::PipelineLayoutCreateInfo::default()
             .set_layouts(&layouts)
             .push_constant_ranges(push_constant_ranges);
         let inner = unsafe {

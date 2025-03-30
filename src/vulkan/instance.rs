@@ -2,20 +2,17 @@ use std::ffi::{c_char, c_void, CStr, CString};
 
 use anyhow::Result;
 use ash::{
-    extensions::ext::DebugUtils,
+    ext::debug_utils::Instance as DebugUtils,
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
 use log::info;
-use raw_window_handle::HasRawDisplayHandle;
+use raw_window_handle::{HasDisplayHandle, HasRawDisplayHandle};
 
 #[cfg(debug_assertions)]
 use anyhow::bail;
 
-use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
-
-#[cfg(debug_assertions)]
-use crate::EngineFeatureValue::{Needed, NotUsed};
+use crate::{engine::EngineFeatureValue, vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
 
 #[allow(dead_code)]
 pub struct Instance {
@@ -29,7 +26,7 @@ pub struct Instance {
 impl Instance {
     pub(crate) fn new(
         entry: &Entry,
-        display_handle: &dyn HasRawDisplayHandle,
+        display_handle: &dyn HasDisplayHandle,
         engine_config: &EngineConfig,
     ) -> Result<Self> {
 
@@ -42,15 +39,15 @@ impl Instance {
 
         // Vulkan instance
         let app_name = CString::new(engine_config.name.as_bytes())?;
-        let app_info = vk::ApplicationInfo::builder()
+        let app_info = vk::ApplicationInfo::default()
             .application_name(app_name.as_c_str())
             .api_version(version.make_api_version());
 
         let mut extension_names =
-            ash_window::enumerate_required_extensions(display_handle.raw_display_handle())?
+            ash_window::enumerate_required_extensions(display_handle.raw_display_handle()?)?
                 .to_vec();
 
-        let mut instance_create_info = vk::InstanceCreateInfo::builder()
+        let mut instance_create_info = vk::InstanceCreateInfo::default()
             .application_info(&app_info);
 
         // Validation Layers
@@ -61,12 +58,12 @@ impl Instance {
         #[cfg(debug_assertions)]
         let (_layer_names, layer_names_ptrs) = get_validation_layer_names_and_pointers();
         #[cfg(debug_assertions)]
-        if engine_config.validation_layers != NotUsed {
+        if engine_config.validation_layers != EngineFeatureValue::NotUsed {
             if check_validation_layer_support(&entry) {
-                extension_names.push(DebugUtils::name().as_ptr());
+                extension_names.push(ash::ext::debug_utils::NAME.as_ptr());
                 instance_create_info = instance_create_info.enabled_layer_names(&layer_names_ptrs);
                 validation_layers = true;
-            } else if engine_config.validation_layers == Needed {
+            } else if engine_config.validation_layers == EngineFeatureValue::Needed {
                 bail!("Validation Layers are needed but not supported by hardware.")
             }
         }
@@ -77,27 +74,25 @@ impl Instance {
         #[cfg(debug_assertions)]
         let mut debug_printing = false;
         #[cfg(debug_assertions)]
-        let mut validation_features = vk::ValidationFeaturesEXT::builder();
+        let mut validation_features = vk::ValidationFeaturesEXT::default();
         #[cfg(debug_assertions)]
-        if engine_config.shader_debug_printing != NotUsed {
+        if engine_config.shader_debug_printing != EngineFeatureValue::NotUsed {
             if validation_layers {
                 validation_features = validation_features.enabled_validation_features(&[vk::ValidationFeatureEnableEXT::DEBUG_PRINTF]);
                 instance_create_info = instance_create_info.push_next(&mut validation_features);
                 debug_printing = true;
-            } else if engine_config.shader_debug_printing == Needed {
+            } else if engine_config.shader_debug_printing == EngineFeatureValue::Needed {
                 bail!("Debug Printing is needed but not supported by hardware.")
             }
         }
 
         // For Mac Support
         if cfg!(target_os = "macos") {
-            extension_names.push(vk::KhrPortabilityEnumerationFn::name().as_ptr());
-            extension_names.push(vk::KhrGetPhysicalDeviceProperties2Fn::name().as_ptr());
+            extension_names.push(ash::khr::portability_enumeration::NAME.as_ptr());
+            extension_names.push(ash::khr::get_physical_device_properties2::NAME.as_ptr());
 
             instance_create_info.flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
         }
-
-
 
         instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
 
@@ -146,15 +141,16 @@ pub fn check_validation_layer_support(entry: &Entry) -> bool {
 
     let mut found = false;
     for required in REQUIRED_DEBUG_LAYERS.iter() {
-        found |= entry
-            .enumerate_instance_layer_properties()
-            .unwrap()
-            .iter()
-            .any(|layer| {
-                let name = unsafe { CStr::from_ptr(layer.layer_name.as_ptr()) };
-                let name = name.to_str().expect("Failed to get layer name pointer");
-                required == &name
-            });
+        found |= unsafe{
+            entry.enumerate_instance_layer_properties()
+                .unwrap()
+                .iter()
+                .any(|layer| {
+                    let name = CStr::from_ptr(layer.layer_name.as_ptr());
+                    let name = name.to_str().expect("Failed to get layer name pointer");
+                    required == &name
+                })
+        }
     }
 
     if !found {
@@ -189,7 +185,7 @@ pub fn setup_debug_messenger(
     _entry: &Entry,
     _instance: &AshInstance,
 ) -> (DebugUtils, vk::DebugUtilsMessengerEXT) {
-    let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+    let create_info = vk::DebugUtilsMessengerCreateInfoEXT::default()
         .message_severity(
             vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE
                 | vk::DebugUtilsMessageSeverityFlagsEXT::INFO

@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use ash::{extensions::khr::Swapchain as AshSwapchain, vk};
+use ash::vk;
 use ash::vk::{ImageUsageFlags};
 use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
 
-use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore, ImageAndView};
+use crate::engine::ImageAndView;
+use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore};
 use crate::vulkan::Image;
 
 pub struct AcquiredImage {
@@ -16,7 +17,7 @@ pub struct AcquiredImage {
 
 pub struct Swapchain {
     device: Arc<Device>,
-    inner: AshSwapchain,
+    inner: ash::khr::swapchain::Device,
     swapchain_khr: vk::SwapchainKHR,
     pub size: UVec2,
     pub format: vk::Format,
@@ -72,7 +73,7 @@ impl Swapchain {
         let present_mode = context.physical_device.present_mode;
         
         let create_info = {
-            let mut builder = vk::SwapchainCreateInfoKHR::builder()
+            let mut builder = vk::SwapchainCreateInfoKHR::default()
                 .surface(context.surface.surface_khr)
                 .min_image_count(image_count)
                 .image_format(format.format)
@@ -98,7 +99,7 @@ impl Swapchain {
                 .clipped(true)
         };
 
-        let inner = AshSwapchain::new(&context.instance.inner, &context.device.inner);
+        let inner = ash::khr::swapchain::Device::new(&context.instance.inner, &context.device.inner);
         let swapchain_khr = unsafe { inner.create_swapchain(&create_info, None)? };
 
         // Swapchain images and image views
@@ -185,7 +186,7 @@ impl Swapchain {
         ];
 
         let create_info = {
-            let mut builder = vk::SwapchainCreateInfoKHR::builder()
+            let mut builder = vk::SwapchainCreateInfoKHR::default()
                 .surface(context.surface.surface_khr)
                 .min_image_count(image_count)
                 .image_format(self.format)
@@ -279,7 +280,7 @@ impl Swapchain {
         let images_indices = [image_index];
         let wait_semaphores = wait_semaphores.iter().map(|s| s.inner).collect::<Vec<_>>();
 
-        let present_info = vk::PresentInfoKHR::builder()
+        let present_info = vk::PresentInfoKHR::default()
             .wait_semaphores(&wait_semaphores)
             .swapchains(&swapchains)
             .image_indices(&images_indices);

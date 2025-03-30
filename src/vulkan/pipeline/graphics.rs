@@ -47,11 +47,10 @@ impl GraphicsPipeline {
         for shader in create_info.shaders.iter() {
             let module = ShaderModule::from_bytes(device.clone(), shader.source)?;
 
-            let stage = vk::PipelineShaderStageCreateInfo::builder()
+            let stage = vk::PipelineShaderStageCreateInfo::default()
                 .stage(shader.stage)
                 .module(module.inner)
-                .name(&entry_point_name)
-                .build();
+                .name(&entry_point_name);
 
             shader_modules.push(module);
             shader_stages_infos.push(stage);
@@ -60,11 +59,11 @@ impl GraphicsPipeline {
         // vertex
         let vertex_bindings = V::bindings();
         let vertex_attributes = V::attributes();
-        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
+        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::default()
             .vertex_binding_descriptions(&vertex_bindings)
             .vertex_attribute_descriptions(&vertex_attributes);
 
-        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
+        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::default()
             .topology(create_info.primitive_topology)
             .primitive_restart_enable(false);
 
@@ -92,14 +91,14 @@ impl GraphicsPipeline {
             })
             .unwrap_or_default();
 
-        let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
+        let viewport_info = vk::PipelineViewportStateCreateInfo::default()
             .viewports(&viewports)
             .viewport_count(1)
             .scissors(&scissors)
             .scissor_count(1);
 
         // raster
-        let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::builder()
+        let rasterizer_info = vk::PipelineRasterizationStateCreateInfo::default()
             .depth_clamp_enable(false)
             .rasterizer_discard_enable(false)
             .polygon_mode(vk::PolygonMode::FILL)
@@ -112,13 +111,12 @@ impl GraphicsPipeline {
             .depth_bias_slope_factor(0.0);
 
         // msaa
-        let multisampling_info = vk::PipelineMultisampleStateCreateInfo::builder()
+        let multisampling_info = vk::PipelineMultisampleStateCreateInfo::default()
             .sample_shading_enable(false)
             .rasterization_samples(vk::SampleCountFlags::TYPE_1)
             .min_sample_shading(1.0)
             .alpha_to_coverage_enable(false)
-            .alpha_to_one_enable(false)
-            .build();
+            .alpha_to_one_enable(false);
 
         // blending
         let color_blend_attachment =
@@ -130,24 +128,24 @@ impl GraphicsPipeline {
                 });
 
         let color_blend_attachments = [color_blend_attachment];
-        let color_blending_info = vk::PipelineColorBlendStateCreateInfo::builder()
+        let color_blending_info = vk::PipelineColorBlendStateCreateInfo::default()
             .logic_op_enable(false)
             .logic_op(vk::LogicOp::COPY)
             .attachments(&color_blend_attachments)
             .blend_constants([0.0, 0.0, 0.0, 0.0]);
 
         // dynamic states
-        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder()
+        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::default()
             .dynamic_states(create_info.dynamic_states.unwrap_or(&[]));
 
         // dynamic rendering
         let color_attachment_formats = [create_info.color_attachment_format];
-        let mut rendering_info = vk::PipelineRenderingCreateInfo::builder()
+        let mut rendering_info = vk::PipelineRenderingCreateInfo::default()
             .color_attachment_formats(&color_attachment_formats)
             .depth_attachment_format(create_info.depth_attachment_format);
 
         // Depth
-        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::default()
             .depth_test_enable(true)
             .depth_write_enable(true)
             .depth_compare_op(vk::CompareOp::LESS)
@@ -157,7 +155,7 @@ impl GraphicsPipeline {
             .stencil_test_enable(false);
 
         // Create Pipeline
-        let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
+        let pipeline_info = vk::GraphicsPipelineCreateInfo::default()
             .stages(&shader_stages_infos)
             .vertex_input_state(&vertex_input_info)
             .input_assembly_state(&input_assembly_info)

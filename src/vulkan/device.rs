@@ -8,10 +8,6 @@ use crate::{
 };
 use crate::vulkan::physical_device::{PhysicalDevice, PhysicalDeviceFeatures};
 
-#[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
-use ash::extensions::khr::Synchronization2;
-use ash::vk::{PhysicalDeviceShaderClockFeaturesKHR};
-
 pub struct Device {
     pub inner: AshDevice,
 }
@@ -33,10 +29,9 @@ impl Device {
             indices
                 .iter()
                 .map(|index| {
-                    vk::DeviceQueueCreateInfo::builder()
+                    vk::DeviceQueueCreateInfo::default()
                         .queue_family_index(*index)
                         .queue_priorities(&queue_priorities)
-                        .build()
                 })
                 .collect::<Vec<_>>()
         };
@@ -54,7 +49,7 @@ impl Device {
         let mut features = PhysicalDeviceFeatures::new(device_features);
         let mut vulkan_features = features.vulkan_features();
 
-        let device_create_info = vk::DeviceCreateInfo::builder()
+        let device_create_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_create_infos)
             .enabled_extension_names(&device_extensions_ptrs)
             .push_next(&mut vulkan_features);
@@ -75,7 +70,7 @@ impl Device {
         queue_family: QueueFamily,
         queue_index: u32,
         #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
-        synchronization2: Synchronization2,
+        synchronization2: ash::khr::synchronization2::Device,
     ) -> Queue {
         let inner = unsafe { self.inner.get_device_queue(queue_family.index, queue_index) };
 
