@@ -100,12 +100,15 @@ impl RayTracingPipeline {
             .max_pipeline_ray_recursion_depth(2);
 
         let inner = unsafe {
-            ray_tracing.pipeline.create_ray_tracing_pipelines(
-                vk::DeferredOperationKHR::null(),
-                vk::PipelineCache::null(),
-                std::slice::from_ref(&pipe_info),
-                None,
-            ).map_err(|(_, e)|e)?[0]
+            ray_tracing
+                .pipeline_fn
+                .create_ray_tracing_pipelines(
+                    vk::DeferredOperationKHR::null(),
+                    vk::PipelineCache::null(),
+                    std::slice::from_ref(&pipe_info),
+                    None,
+                )
+                .map_err(|e| e.1)?[0]
         };
 
         Ok(Self {

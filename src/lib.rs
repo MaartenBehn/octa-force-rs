@@ -84,7 +84,7 @@ fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
     event_loop.set_control_flow(ControlFlow::Poll);
     
     let mut global_container = GlobalContainer::<B>::new(engine_config)?;
-    event_loop.run_app(&mut global_container);
+    event_loop.run_app(&mut global_container)?;
      
     Ok(())
 }

@@ -466,7 +466,7 @@ impl CommandBuffer {
 
         unsafe {
             ray_tracing
-                .acceleration_structure
+                .acceleration_structure_fn
                 .cmd_build_acceleration_structures(
                     self.inner,
                     std::slice::from_ref(as_build_geo_info),
@@ -482,7 +482,7 @@ impl CommandBuffer {
             .expect("Cannot call CommandBuffer::trace_rays when ray tracing is not enabled");
 
         unsafe {
-            ray_tracing.pipeline.cmd_trace_rays(
+            ray_tracing.pipeline_fn.cmd_trace_rays(
                 self.inner,
                 &shader_binding_table.raygen_region,
                 &shader_binding_table.miss_region,

@@ -1,2 +1,4 @@
 /target
 /example/test_hot_reloading/target/
+.direnv
+.envrc

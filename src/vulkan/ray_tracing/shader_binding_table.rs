@@ -2,8 +2,7 @@ use anyhow::Result;
 use ash::vk;
 use gpu_allocator::MemoryLocation;
 
-use crate::{Buffer, Context, RayTracingContext, RayTracingPipeline};
-use crate::vulkan::utils::compute_aligned_size;
+use crate::{vulkan::utils::compute_aligned_size, Buffer, Context, RayTracingContext, RayTracingPipeline};
 
 pub struct ShaderBindingTable {
     _buffer: Buffer,
@@ -23,7 +22,7 @@ impl ShaderBindingTable {
         // Handle size & aligment
         let handle_size = ray_tracing.pipeline_properties.shader_group_handle_size;
         let handle_alignment = ray_tracing
-            .pipeline
+            .pipeline_properties
             .shader_group_handle_alignment;
         let aligned_handle_size = compute_aligned_size(handle_size, handle_alignment);
         let handle_pad = aligned_handle_size - handle_size;
@@ -34,7 +33,7 @@ impl ShaderBindingTable {
         let data_size = desc.group_count * handle_size;
         let handles = unsafe {
             ray_tracing
-                .pipeline
+                .pipeline_fn
                 .get_ray_tracing_shader_group_handles(
                     pipeline.inner,
                     0,
