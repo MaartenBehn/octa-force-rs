@@ -135,8 +135,6 @@ impl Engine {
         binding: &mut Binding<B>, 
         render_state: &mut B::RenderState, 
         logic_state: &mut B::LogicState,
-        #[cfg(debug_assertions)]
-        dropped_render_state: &mut Vec<(B::RenderState, usize)>
     ) -> OctaResult<bool> {
         #[cfg(debug_assertions)]
         puffin::profile_function!();
@@ -168,33 +166,6 @@ impl Engine {
         self.in_flight_frames.fence().reset()?;
         
         // debug!("Frame Index: {frame_index}", );
-
-
-        #[cfg(debug_assertions)]
-        if let Binding::HotReload(b) = binding {
-            for i in (0..dropped_render_state.len()).rev() {
-                if dropped_render_state[i].1 == frame_index {
-                    // Dosen't work 
-                    dropped_render_state.remove(i);
-                }
-            }
-            
-            if b.lib_reloader.can_update() {
-                debug!("Hot reload");
-                b.active = true;
-                
-                b.lib_reloader.update()?;
-
-                binding.init_hot_reload()?;
-                
-                let mut new_render_state = binding.new_render_state(logic_state, self)?;
-                mem::swap(render_state, &mut new_render_state);
-                
-                dropped_render_state.push((new_render_state, frame_index));
-                
-                debug!("Hot reload done");
-            }
-        }
         
         {
             #[cfg(debug_assertions)]
@@ -300,10 +271,7 @@ fn create_command_buffers(pool: &CommandPool, swapchain: &Swapchain) -> OctaResu
     pool.allocate_command_buffers(vk::CommandBufferLevel::PRIMARY, swapchain.images_and_views.len() as _)
 }
 
-pub struct ImageAndView {
-    pub view: ImageView,
-    pub image: Image,
-}
+
 
 struct InFlightFrames {
     per_frames: Vec<PerFrame>,

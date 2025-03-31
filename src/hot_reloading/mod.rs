@@ -31,7 +31,7 @@ impl HotReloadController {
         
         Ok(HotReloadController {
             lib_reloader,
-            active: false,
+            active: true,
         })
     }
 }

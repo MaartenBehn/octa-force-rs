@@ -38,19 +38,7 @@ impl Camera {
             speed: 3.0,
             up,
         }
-    }
-
-    pub fn base(size: Vec2) -> Self {
-        Self::new(
-            vec3(0.0, 0.0, 1.0),
-            vec3(0.0, 0.0, -1.0),
-            60.0,
-            size.x / size.y,
-            0.1,
-            10.0,
-            vec3(0.0, 1.0, 0.0),
-        )
-    }
+    } 
     
     pub fn set_screen_size(&mut self, size: Vec2) {
         self.aspect_ratio = size.x / size.y
@@ -149,4 +137,18 @@ pub fn perspective(fovy: f32, aspect: f32, near: f32, far: f32) -> Mat4 {
         c2r0, c2r1, c2r2, c2r3,
         c3r0, c3r1, c3r2, c3r3
     ])
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        Self::new(
+            vec3(0.0, 0.0, 1.0),
+            vec3(0.0, 0.0, -1.0),
+            60.0,
+            1.0,
+            0.1,
+            10.0,
+            vec3(0.0, 1.0, 0.0),
+        )
+    }
 }

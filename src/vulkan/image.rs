@@ -201,3 +201,8 @@ impl Drop for ImageView {
         unsafe { self.device.inner.destroy_image_view(self.inner, None) };
     }
 }
+
+pub struct ImageAndView {
+    pub view: ImageView,
+    pub image: Image,
+}

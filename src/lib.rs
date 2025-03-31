@@ -6,6 +6,8 @@ pub extern crate log;
 pub extern crate egui;
 pub extern crate egui_ash_renderer;
 pub extern crate egui_winit;
+pub extern crate puffin_egui;
+pub extern crate egui_extras;
 
 pub mod camera;
 pub mod controls;
@@ -19,7 +21,7 @@ pub mod binding;
 pub mod engine;
 
 use engine::{Engine, EngineConfig};
-use std::{env, thread, time::{Duration, Instant}};
+use std::{env, ops::Not, thread, time::{Duration, Instant}};
 use log::{debug, error, info, trace};
 use vulkan::*;
 use winit::{
@@ -42,13 +44,13 @@ struct GlobalContainer<B: BindingTrait> {
     engine_config: EngineConfig,
     binding: Binding<B>,
     logic_state: B::LogicState,
-    active: Option<ActiveContainer<B>>
+
+    active: Option<ActiveContainer<B>>,
+    to_drop_active: Vec<(ActiveContainer<B>, Instant)>,
 }
 
 struct ActiveContainer<B: BindingTrait> {
     render_state: B::RenderState,
-    #[cfg(debug_assertions)]
-    dropped_render_states: Vec<(B::RenderState, usize)>,
 
     engine: Engine,
     
@@ -98,7 +100,8 @@ impl<B: BindingTrait> GlobalContainer<B> {
             engine_config,
             binding,
             logic_state,
-            active: None, 
+            active: None,
+            to_drop_active: vec![]
         })
     }
 }
@@ -148,6 +151,39 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        
+        #[cfg(debug_assertions)]
+        if let Binding::HotReload(b) = &mut self.binding {
+            for i in (0..self.to_drop_active.len()).rev() {
+                if self.to_drop_active[i].1.elapsed().as_secs_f32() > 5.0  {
+                    self.to_drop_active.remove(i);
+                }
+            }
+            
+            if b.lib_reloader.can_update() {
+                b.active = true;
+                                
+                b.lib_reloader.update().unwrap();
+                self.binding.init_hot_reload().unwrap();
+
+                if self.active.is_some() {
+                    let old_active = self.active.take().unwrap();
+                    //old_active.engine.wait_for_gpu().unwrap();
+                    self.to_drop_active.push((old_active, Instant::now()));
+                }
+
+                self.active = Some(ActiveContainer::new(
+                    event_loop, 
+                    &self.engine_config, 
+                    &self.binding,
+                    &mut self.logic_state).unwrap());
+
+                
+                debug!("Hot reload done");
+            }
+        }
+
+
         Self::handle_err(&mut self.active, |x| { 
             x.about_to_wait(event_loop, &mut self.logic_state, &mut self.binding) 
         }, "about_to_wait");  
@@ -191,8 +227,6 @@ impl<B: BindingTrait> ActiveContainer<B> {
 
         let mut engine = Engine::new(&event_loop, &engine_config)?;
         let render_state = binding.new_render_state(logic_state, &mut engine)?;
-        #[cfg(debug_assertions)]
-        let dropped_render_states: Vec<(B::RenderState, usize)> = vec![];
         
         let is_swapchain_dirty = false;
 
@@ -203,8 +237,6 @@ impl<B: BindingTrait> ActiveContainer<B> {
          
         Ok(Self {
             render_state,
-            #[cfg(debug_assertions)]
-            dropped_render_states,
             engine,
             is_swapchain_dirty,
             last_frame,
@@ -319,7 +351,6 @@ impl<B: BindingTrait> ActiveContainer<B> {
             binding,
             &mut self.render_state,
             logic_state,
-            #[cfg(debug_assertions)] &mut self.dropped_render_states
         ).expect("Failed to tick");
 
         Ok(())

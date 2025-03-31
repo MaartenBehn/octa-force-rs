@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{self, File};
 
 use log::{LevelFilter, Log};
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode, WriteLogger};
@@ -7,7 +7,7 @@ use crate::OctaResult;
 pub fn log_init() -> OctaResult<()> {
     #[cfg(debug_assertions)]
     {
-        let term = 
+        let _ = fs::remove_file("trace.log"); 
         CombinedLogger::init(vec![
             TermLogger::new(
                 LevelFilter::Debug,
@@ -16,11 +16,11 @@ pub fn log_init() -> OctaResult<()> {
                 ColorChoice::Auto,
             ),
             WriteLogger::new(
-                LevelFilter::Trace, 
+                LevelFilter::Debug, 
                 Config::default(), 
                 File::create("trace.log")?
             ),
-        ]);
+        ])?;
     }
 
     #[cfg(not(debug_assertions))]

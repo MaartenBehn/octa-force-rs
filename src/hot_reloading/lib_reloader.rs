@@ -31,13 +31,11 @@ pub struct LibReloader {
     load_counter: usize,
     lib_dir: PathBuf,
     lib_name: String,
-    running: Arc<AtomicBool>,
     changed: Arc<AtomicBool>,
     lib: Option<Library>,
     watched_lib_file: PathBuf,
     loaded_lib_file: PathBuf,
     lib_file_hash: Arc<AtomicU32>,
-    file_change_subscribers: Arc<Mutex<Vec<mpsc::Sender<()>>>>,
     #[cfg(target_os = "macos")]
     codesigner: crate::codesign::CodeSigner,
     loaded_lib_name_template: Option<String>,
@@ -88,16 +86,12 @@ impl LibReloader {
             (0, None)
         };
 
-        let running = Arc::new(AtomicBool::new(true));
         let lib_file_hash = Arc::new(AtomicU32::new(lib_file_hash));
         let changed = Arc::new(AtomicBool::new(false));
-        let file_change_subscribers = Arc::new(Mutex::new(Vec::new()));
         Self::watch(
-            running.clone(),
             watched_lib_file.clone(),
             lib_file_hash.clone(),
             changed.clone(),
-            file_change_subscribers.clone(),
             file_watch_debounce.unwrap_or_else(|| Duration::from_millis(500)),
         )?;
 
@@ -110,26 +104,14 @@ impl LibReloader {
             lib,
             lib_file_hash,
             changed,
-            file_change_subscribers,
             #[cfg(target_os = "macos")]
             codesigner,
             loaded_lib_name_template,
-            running,
         };
 
         Ok(lib_loader)
     }
 
-    // needs to be public as it is used inside the hot_module macro.
-    #[doc(hidden)]
-    pub fn subscribe_to_file_changes(&mut self) -> mpsc::Receiver<()> {
-        log::trace!("subscribe to file change");
-        let (tx, rx) = mpsc::channel();
-        let mut subscribers = self.file_change_subscribers.lock().unwrap();
-        subscribers.push(tx);
-        rx
-    }
-    
     pub fn can_update(&mut self) -> bool {
         self.changed.load(Ordering::Acquire)
     }
@@ -140,9 +122,9 @@ impl LibReloader {
         if !self.can_update() {
             return Ok(false);
         }
-        self.changed.store(false, Ordering::Release);
-
+        
         self.reload()?;
+        self.changed.store(false, Ordering::Release);
 
         Ok(true)
     }
@@ -178,7 +160,7 @@ impl LibReloader {
                 *load_counter,
                 loaded_lib_name_template,
             );
-            log::trace!("copy {watched_lib_file:?} -> {loaded_lib_file:?}");
+            log::debug!("copy {watched_lib_file:?} -> {loaded_lib_file:?}");
             fs::copy(watched_lib_file, &loaded_lib_file)?;
             self.lib_file_hash
                 .store(hash_file(&loaded_lib_file), Ordering::Release);
@@ -195,11 +177,9 @@ impl LibReloader {
 
     /// Watch for changes of `lib_file`.
     fn watch(
-        running: Arc<AtomicBool>,
         lib_file: impl AsRef<Path>,
         lib_file_hash: Arc<AtomicU32>,
         changed: Arc<AtomicBool>,
-        file_change_subscribers: Arc<Mutex<Vec<mpsc::Sender<()>>>>,
         debounce: Duration,
     ) -> OctaResult<()> {
         let lib_file = lib_file.as_ref().to_path_buf();
@@ -209,106 +189,29 @@ impl LibReloader {
         // a pending change still waiting to be loaded, set `self.changed` to true. This
         // then gets picked up by `self.update`.
         thread::spawn(move || {
-            let (tx, rx) = mpsc::channel();
 
-            let mut debouncer =
-                new_debouncer(debounce, None, tx).expect("creating notify debouncer");
-
-            debouncer
-                .watch(&lib_file, RecursiveMode::NonRecursive)
-                .expect("watch lib file");
-
-            // debouncer
-            //     .cache()
-            //     .add_root(dir.path(), RecursiveMode::Recursive);
-
-            // let mut watcher = RecommendedWatcher::new(tx, Config::default()).unwrap();
-            // watcher
-            //     .watch(&lib_file, RecursiveMode::NonRecursive)
-            //     .expect("watch lib file");
-
-            let signal_change = || {
-                if hash_file(&lib_file) == lib_file_hash.load(Ordering::Acquire)
-                    || changed.load(Ordering::Acquire)
+            let lib_file_copy = lib_file.to_owned();
+            let mut debouncer = new_debouncer(debounce, None, move |event| {
+                if //hash_file(&lib_file) == lib_file_hash.load(Ordering::Acquire) ||
+                    !lib_file_copy.exists() ||
+                    changed.load(Ordering::Acquire)
                 {
                     // file not changed
-                    return false;
+                    return;
                 }
 
-                log::debug!("{lib_file:?} changed",);
+                log::debug!("Lib changed",);
 
                 changed.store(true, Ordering::Release);
-
-                // inform subscribers
-                let subscribers = file_change_subscribers.lock().unwrap();
-                log::trace!(
-                    "sending ChangedEvent::LibFileChanged to {} subscribers",
-                    subscribers.len()
-                );
-                for tx in &*subscribers {
-                    let _ = tx.send(());
-                }
-
-                true
-            };
+            }).expect("creating notify debouncer");
 
             loop {
-                match rx.recv() {
-                    Err(_) => {
-                        log::info!("file watcher channel closed");
-                        break;
-                    }
-                    Ok(events) => {
-                        if !running.load(Ordering::Acquire) {
-                            log::info!("Stopping Hot Reload Watcher");
-                            break;
-                        }
-                        
-                        let events = match events {
-                            Err(errors) => {
-                                log::error!("{} file watcher error!", errors.len());
-                                for err in errors {
-                                    log::error!("  {err}");
-                                }
-                                continue;
-                            }
-                            Ok(events) => events,
-                        };
-
-                        log::trace!("file change events: {events:?}");
-                        let was_removed =
-                            events
-                                .iter()
-                                .fold(false, |was_removed, event| match event.kind {
-                                    notify::EventKind::Create(_) | notify::EventKind::Modify(_) => {
-                                        false
-                                    }
-                                    notify::EventKind::Remove(_) => true,
-                                    _ => was_removed,
-                                });
-                        // just one hard link removed?
-                        if was_removed || !lib_file.exists() {
-                            log::debug!(
-                                "{} was removed, trying to watch it again...",
-                                lib_file.display()
-                            );
-                        }
-                        loop {
-                            if debouncer
-                                .watch(&lib_file, RecursiveMode::NonRecursive)
-                                .is_ok()
-                            {
-                                log::info!("watching {lib_file:?} again after removal");
-                                signal_change();
-                                break;
-                            }
-                            thread::sleep(Duration::from_millis(500));
-                        }
-                    }
-                }
+                let res = debouncer
+                    .watch(&lib_file, RecursiveMode::NonRecursive);
+                //log::debug!("{:?}", res);
             }
+            
         });
-
         Ok(())
     }
 
@@ -339,9 +242,7 @@ impl LibReloader {
 
 /// Deletes the currently loaded lib file if it exists
 impl Drop for LibReloader {
-    fn drop(&mut self) {
-        self.running.store(false, Ordering::Release);
-        
+    fn drop(&mut self) {       
         if self.loaded_lib_file.exists() {
             log::trace!("removing {:?}", self.loaded_lib_file);
             let _ = fs::remove_file(&self.loaded_lib_file);

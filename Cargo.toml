@@ -27,8 +27,8 @@ egui-winit = "0.31"
 # Forked for BGR-Texture Format support
 egui-ash-renderer = { git="https://github.com/MaartenBehn/egui-ash-renderer.git", version = "0.8.0", features = ["gpu-allocator", "dynamic-rendering"]}
 # egui-ash-renderer = { path="../egui-ash-renderer", features = ["gpu-allocator", "dynamic-rendering"]}
-# egui_extras = { version = "0.31", default-features = false, features = ["all_loaders"] }
-# image = { version = "0.25", features = ["jpeg", "png"] }
+egui_extras = { version = "0.31", default-features = false, features = ["all_loaders"] }
+image = { version = "0.25", features = ["jpeg", "png"] }
 
 puffin_egui = { git="https://github.com/MaartenBehn/puffin", version="0.29" }
 #puffin_egui = { path="../puffin/puffin_egui" }

@@ -6,9 +6,10 @@ use ash::vk::{ImageUsageFlags};
 use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
 
-use crate::engine::ImageAndView;
 use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore};
 use crate::vulkan::Image;
+
+use super::ImageAndView;
 
 pub struct AcquiredImage {
     pub index: u32,
