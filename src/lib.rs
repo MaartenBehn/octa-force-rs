@@ -21,8 +21,9 @@ pub mod binding;
 pub mod engine;
 
 use engine::{Engine, EngineConfig};
-use std::{env, ops::Not, thread, time::{Duration, Instant}};
-use log::{debug, error, info, trace};
+use core::panic;
+use std::{env, ops::Not, process, thread, time::{Duration, Instant}};
+use log::{debug, error, info, logger, trace};
 use vulkan::*;
 use winit::{
     application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}};
@@ -38,27 +39,28 @@ use crate::binding::{get_binding, Binding};
 use crate::binding::r#trait::BindingTrait;
 use crate::logger::{log_init};
 
+
 pub type OctaResult<V> = anyhow::Result<V>;
 
 struct GlobalContainer<B: BindingTrait> {
-    engine_config: EngineConfig,
-    binding: Binding<B>,
-    logic_state: B::LogicState,
+    pub engine_config: EngineConfig,
+    pub binding: Binding<B>,
+    pub logic_state: B::LogicState,
 
-    active: Option<ActiveContainer<B>>,
-    to_drop_active: Vec<(ActiveContainer<B>, Instant)>,
+    pub active: Option<ActiveContainer<B>>,
+    pub dropped_render_state: Vec<B::RenderState>,
 }
 
 struct ActiveContainer<B: BindingTrait> {
-    render_state: B::RenderState,
+    pub render_state: B::RenderState,
 
-    engine: Engine,
+    pub engine: Engine,
     
-    is_swapchain_dirty: bool,
-    last_frame: Instant,
-    last_frame_start: Instant,
+    pub is_swapchain_dirty: bool,
+    pub last_frame: Instant,
+    pub last_frame_start: Instant,
 
-    fps_as_duration: Duration,
+    pub fps_as_duration: Duration,
 }
 
 pub fn run<B: BindingTrait>(engine_config: EngineConfig) { 
@@ -82,11 +84,20 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) {
 }
 
 fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> { 
+    let mut global_container = GlobalContainer::<B>::new(engine_config)?;
+        
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
-    
-    let mut global_container = GlobalContainer::<B>::new(engine_config)?;
+
     event_loop.run_app(&mut global_container)?;
+    
+    #[cfg(debug_assertions)]
+    if let Binding::HotReload(b) = global_container.binding {            
+        if b.active {
+            // Killing process because normal dropping would freeze the window.
+            process::exit(0);
+        }
+    }
      
     Ok(())
 }
@@ -101,7 +112,7 @@ impl<B: BindingTrait> GlobalContainer<B> {
             binding,
             logic_state,
             active: None,
-            to_drop_active: vec![]
+            dropped_render_state: vec![],
         })
     }
 }
@@ -151,41 +162,8 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        
-        #[cfg(debug_assertions)]
-        if let Binding::HotReload(b) = &mut self.binding {
-            for i in (0..self.to_drop_active.len()).rev() {
-                if self.to_drop_active[i].1.elapsed().as_secs_f32() > 5.0  {
-                    self.to_drop_active.remove(i);
-                }
-            }
-            
-            if b.lib_reloader.can_update() {
-                b.active = true;
-                                
-                b.lib_reloader.update().unwrap();
-                self.binding.init_hot_reload().unwrap();
-
-                if self.active.is_some() {
-                    let old_active = self.active.take().unwrap();
-                    //old_active.engine.wait_for_gpu().unwrap();
-                    self.to_drop_active.push((old_active, Instant::now()));
-                }
-
-                self.active = Some(ActiveContainer::new(
-                    event_loop, 
-                    &self.engine_config, 
-                    &self.binding,
-                    &mut self.logic_state).unwrap());
-
-                
-                debug!("Hot reload done");
-            }
-        }
-
-
         Self::handle_err(&mut self.active, |x| { 
-            x.about_to_wait(event_loop, &mut self.logic_state, &mut self.binding) 
+            x.about_to_wait(event_loop, &mut self.logic_state, &mut self.binding, &mut self.dropped_render_state) 
         }, "about_to_wait");  
     }
 
@@ -333,7 +311,27 @@ impl<B: BindingTrait> ActiveContainer<B> {
         event_loop: &ActiveEventLoop, 
         logic_state: &mut B::LogicState, 
         binding: &mut Binding<B>, 
+        dropped_render_state: &mut Vec<B::RenderState>,
     ) -> OctaResult<()> {
+
+        #[cfg(debug_assertions)]
+        if let Binding::HotReload(b) = binding {            
+            if b.lib_reloader.can_update() {
+                b.active = true;
+                info!("Init Hot Reload");
+
+                b.lib_reloader.update()?;
+                binding.init_hot_reload()?;
+                let mut render_state = binding.new_render_state(logic_state, &mut self.engine)?;
+                mem::swap(&mut render_state, &mut self.render_state);
+
+                // Droppeing memory created in lib will frezze the game so we just keep it.
+                dropped_render_state.push(render_state);
+
+                info!("Hot Reload done");
+            }
+        }
+
         if self.is_swapchain_dirty {
             let dim = self.engine.window.inner_size();
             if dim.width > 0 && dim.height > 0 {
