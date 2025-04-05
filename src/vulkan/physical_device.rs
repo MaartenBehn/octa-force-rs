@@ -5,7 +5,6 @@ use anyhow::{bail, Result};
 use ash::{vk};
 use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceShaderClockFeaturesKHR, PhysicalDeviceType, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
 use log::error;
-use notify::event::CreateKind;
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
 use crate::vulkan::instance::Instance;
 

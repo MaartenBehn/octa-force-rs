@@ -2,26 +2,22 @@ use glam::UVec2;
 use log::{debug, info};
 use winit::window::Window;
 
-use crate::{AcquiredImage, Fence, Image, ImageView, OctaResult, Semaphore, SemaphoreSubmitInfo, TimestampQueryPool};
+use crate::{AcquiredImage, Fence, OctaResult, Semaphore, SemaphoreSubmitInfo, TimestampQueryPool};
 use crate::{controls::Controls, gui::Gui, hot_reloading::HotReloadConfig, stats::FrameStats, CommandBuffer, CommandPool, Context, Swapchain};
 
 use crate::stats::{StatsDisplayMode};
 use ash::vk::{self};
 use winit::{
-    application::ApplicationHandler, dpi::PhysicalSize, event::{ElementState, Event, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, window::{WindowAttributes}
+    dpi::PhysicalSize, event_loop::ActiveEventLoop, window::{WindowAttributes}
 };
-use winit::event::KeyEvent;
-use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[cfg(debug_assertions)]
 use puffin_egui::puffin;
 #[cfg(debug_assertions)]
-use std::mem;
 use std::time::Duration;
 
-use crate::binding::{get_binding, Binding};
+use crate::binding::Binding;
 use crate::binding::r#trait::BindingTrait;
-use crate::logger::{log_init};
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub enum EngineFeatureValue {
@@ -40,7 +36,7 @@ pub struct EngineConfig {
     pub validation_layers: EngineFeatureValue,
     pub shader_debug_printing: EngineFeatureValue,
     pub shader_debug_clock: EngineFeatureValue,
-    pub GL_EXT_scalar_block_layout: EngineFeatureValue,
+    pub gl_ext_scalar_block_layout: EngineFeatureValue,
 
     pub hot_reload_config: Option<HotReloadConfig>
 }
@@ -273,7 +269,7 @@ fn create_command_buffers(pool: &CommandPool, swapchain: &Swapchain) -> OctaResu
 
 
 
-struct InFlightFrames {
+pub(crate) struct InFlightFrames {
     per_frames: Vec<PerFrame>,
     current_frame: usize,
 }

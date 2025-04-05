@@ -5,7 +5,7 @@ use gpu_allocator::{
     vulkan::{Allocator, AllocatorCreateDesc},
     AllocatorDebugSettings,
 };
-use raw_window_handle::{HasDisplayHandle, HasRawDisplayHandle, HasRawWindowHandle, HasWindowHandle};
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use crate::{engine::EngineFeatureValue, vulkan::{device::Device, instance::Instance, queue::Queue, surface::Surface}, CommandBuffer, CommandPool, EngineConfig, RayTracingContext};
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
@@ -114,9 +114,9 @@ impl Context {
             ]);
         };
 
-        if engine_config.GL_EXT_scalar_block_layout == EngineFeatureValue::Wanted {
+        if engine_config.gl_ext_scalar_block_layout == EngineFeatureValue::Wanted {
             wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
-        } else if engine_config.GL_EXT_scalar_block_layout == EngineFeatureValue::Needed {
+        } else if engine_config.gl_ext_scalar_block_layout == EngineFeatureValue::Needed {
             wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
             required_extensions.push("VK_EXT_scalar_block_layout".to_owned());
         };

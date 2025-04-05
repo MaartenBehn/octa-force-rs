@@ -21,17 +21,14 @@ pub mod binding;
 pub mod engine;
 
 use engine::{Engine, EngineConfig};
-use core::panic;
-use std::{env, ops::Not, process, thread, time::{Duration, Instant}};
-use log::{debug, error, info, logger, trace};
+use std::{env, process, thread, time::{Duration, Instant}};
+use log::{debug, error, info, trace};
 use vulkan::*;
 use winit::{
     application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}};
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
-#[cfg(debug_assertions)]
-use puffin_egui::puffin;
 #[cfg(debug_assertions)]
 use std::mem;
 
@@ -133,7 +130,7 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
         }
     }
 
-    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: winit::event::StartCause) {
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
         Self::handle_err(&mut self.active, |x| { 
             x.new_events() 
         }, "new_events"); 
@@ -142,7 +139,7 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        window_id: winit::window::WindowId,
+        _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
         Self::handle_err(&mut self.active, |x| { 
@@ -152,8 +149,8 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
 
     fn device_event(
             &mut self,
-            event_loop: &ActiveEventLoop,
-            device_id: winit::event::DeviceId,
+            _event_loop: &ActiveEventLoop,
+            _device_id: winit::event::DeviceId,
             event: winit::event::DeviceEvent,
         ) {
         Self::handle_err(&mut self.active, |x| { 
@@ -167,7 +164,7 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
         }, "about_to_wait");  
     }
 
-    fn exiting(&mut self, event_loop: &ActiveEventLoop) {
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
         Self::handle_err(&mut self.active, |x| { 
             x.exiting() 
         }, "exiting"); 
@@ -308,7 +305,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
 
     fn about_to_wait(
         &mut self, 
-        event_loop: &ActiveEventLoop, 
+        _event_loop: &ActiveEventLoop, 
         logic_state: &mut B::LogicState, 
         binding: &mut Binding<B>, 
         dropped_render_state: &mut Vec<B::RenderState>,

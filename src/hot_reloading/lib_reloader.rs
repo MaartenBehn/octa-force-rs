@@ -1,11 +1,11 @@
 use libloading::{Library, Symbol};
-use notify::{RecursiveMode, Watcher};
+use notify::RecursiveMode;
 use notify_debouncer_full::new_debouncer;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, Ordering},
-    mpsc, Arc, Mutex,
+    Arc,
 };
 use std::thread;
 use std::time::Duration;
@@ -191,8 +191,8 @@ impl LibReloader {
         thread::spawn(move || {
 
             let lib_file_copy = lib_file.to_owned();
-            let mut debouncer = new_debouncer(debounce, None, move |event| {
-                if //hash_file(&lib_file) == lib_file_hash.load(Ordering::Acquire) ||
+            let mut debouncer = new_debouncer(debounce, None, move |_event| {
+                if hash_file(&lib_file_copy) == lib_file_hash.load(Ordering::Acquire) ||
                     !lib_file_copy.exists() ||
                     changed.load(Ordering::Acquire)
                 {
@@ -206,7 +206,7 @@ impl LibReloader {
             }).expect("creating notify debouncer");
 
             loop {
-                let res = debouncer
+                let _ = debouncer
                     .watch(&lib_file, RecursiveMode::NonRecursive);
                 //log::debug!("{:?}", res);
             }

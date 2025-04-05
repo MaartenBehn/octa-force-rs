@@ -1,5 +1,5 @@
 use glam::{vec2, Vec2};
-use winit::event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent};
+use winit::event::{DeviceEvent, ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -97,6 +97,7 @@ impl Controls {
                     self.mouse_left = *state == ElementState::Pressed;
                 }
             }
+            WindowEvent::MouseWheel { delta, .. } => self.handle_mouse_wheel(delta),
             _ => {}
         };
     }
@@ -109,16 +110,19 @@ impl Controls {
                 self.cursor_delta =
                     vec2(self.cursor_delta[0] + x, self.cursor_delta[1] + y);
             }
-            DeviceEvent::MouseWheel { delta } => match delta {
-                winit::event::MouseScrollDelta::LineDelta(_, y) => {
-                    self.scroll_delta = *y;
-                }
-                winit::event::MouseScrollDelta::PixelDelta(d) => {
-                    self.scroll_delta = d.y as f32;
-                }
-            },
-
+            DeviceEvent::MouseWheel { delta } => self.handle_mouse_wheel(delta),
             _ => (),
         };
+    }
+
+    fn handle_mouse_wheel(&mut self, delta: &MouseScrollDelta) {
+        match delta {
+            winit::event::MouseScrollDelta::LineDelta(_, y) => {
+                self.scroll_delta = *y;
+            }
+            winit::event::MouseScrollDelta::PixelDelta(d) => {
+                self.scroll_delta = d.y as f32;
+            }
+        }
     }
 }

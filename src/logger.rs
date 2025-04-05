@@ -39,12 +39,6 @@ pub fn log_init() -> OctaResult<()> {
 pub fn setup_logger(
     logger: &'static dyn Log,
 ) -> OctaResult<()> {
-    #[cfg(debug_assertions)]
-    let log_level = LevelFilter::Debug;
-
-    #[cfg(not(debug_assertions))]
-    let log_level = LevelFilter::Info;
-    
     log::set_logger(logger)?;
     Ok(())
 }
