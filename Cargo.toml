@@ -1,6 +1,6 @@
 [package]
 name = "octa-force"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -25,13 +25,13 @@ egui = "0.30"
 egui_plot = "0.30"
 egui-winit = "0.30"
 # Forked for BGR-Texture Format support
-egui-ash-renderer = { path="../egui-ash-renderer", features = ["gpu-allocator", "dynamic-rendering"]}
-# egui-ash-renderer = { git="https://github.com/MaartenBehn/egui-ash-renderer.git", version = "0.8.0", features = ["gpu-allocator", "dynamic-rendering"]}
+#egui-ash-renderer = { path="../egui-ash-renderer", features = ["gpu-allocator", "dynamic-rendering"]}
+egui-ash-renderer = { git="https://github.com/MaartenBehn/egui-ash-renderer.git", version = "0.8.0", features = ["gpu-allocator", "dynamic-rendering"]}
 egui_extras = { version = "0.30", default-features = false, features = ["all_loaders"] }
 image = { version = "0.25", features = ["jpeg", "png"] }
 
-puffin_egui = { path="../puffin/puffin_egui" }
-# puffin_egui = { git="https://github.com/MaartenBehn/puffin", version="0.29" }
+# puffin_egui = { path="../puffin/puffin_egui" }
+puffin_egui = { git="https://github.com/MaartenBehn/puffin", version="0.29" }
 serde_json = "^1"
 
 # For hot reloading

@@ -649,6 +649,7 @@ dependencies = [
 [[package]]
 name = "egui-ash-renderer"
 version = "0.8.0"
+source = "git+https://github.com/MaartenBehn/egui-ash-renderer.git#a3b4e14786f635d8b0440911909c691122aff0b3"
 dependencies = [
  "ash",
  "egui",
@@ -2014,7 +2015,7 @@ dependencies = [
 
 [[package]]
 name = "octa-force"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "ash",
@@ -2270,6 +2271,7 @@ dependencies = [
 [[package]]
 name = "puffin"
 version = "0.19.1"
+source = "git+https://github.com/MaartenBehn/puffin#1008c7ea1d575052ddb986e2b86c3a25513ca858"
 dependencies = [
  "anyhow",
  "bincode",
@@ -2285,6 +2287,7 @@ dependencies = [
 [[package]]
 name = "puffin_egui"
 version = "0.29.0"
+source = "git+https://github.com/MaartenBehn/puffin#1008c7ea1d575052ddb986e2b86c3a25513ca858"
 dependencies = [
  "egui",
  "egui_extras",
