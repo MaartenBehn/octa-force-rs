@@ -1,3 +1,5 @@
+use std::fmt;
+
 use anyhow::Result;
 use ash::{khr::surface, vk, Entry};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
@@ -36,5 +38,14 @@ impl Drop for Surface {
         unsafe {
             self.inner.destroy_surface(self.surface_khr, None);
         }
+    }
+}
+
+impl fmt::Debug for Surface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Surface")
+            .field("inner", &())
+            .field("surface_khr", &self.surface_khr)
+            .finish()
     }
 }

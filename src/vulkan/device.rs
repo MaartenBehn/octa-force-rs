@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{ffi::CString, sync::Arc};
 
 use anyhow::Result;
@@ -92,4 +93,8 @@ impl Drop for Device {
     }
 }
 
-
+impl fmt::Debug for Device {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Device").field("inner", &()).finish()
+    }
+}

@@ -1,12 +1,12 @@
-use std::ffi::{c_char, c_void, CStr, CString};
+use std::{ffi::{c_char, c_void, CStr, CString}, fmt};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use ash::{
     ext::debug_utils::Instance as DebugUtils,
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
-use log::info;
+use log::{debug, info};
 use raw_window_handle::{HasDisplayHandle, HasRawDisplayHandle};
 
 #[cfg(debug_assertions)]
@@ -97,7 +97,10 @@ impl Instance {
         instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
 
         // Creating Instance
-        let inner = unsafe { entry.create_instance(&instance_create_info, None)? };
+        let inner = unsafe { 
+            entry.create_instance(&instance_create_info, None)
+                .context("Creating Instance")?
+        };
 
         // Validation
         let debug_report_callback = if validation_layers {
@@ -172,7 +175,7 @@ unsafe extern "system" fn vulkan_debug_callback(
     let message = CStr::from_ptr((*p_callback_data).p_message);
     match flag {
         Flag::VERBOSE => log::trace!("{:?} - {:?}", typ, message),
-        Flag::INFO => { log::trace!("{:?} - {:?}", typ, message) },
+        Flag::INFO => { log::info!("{:?} - {:?}", typ, message) },
         Flag::WARNING => log::warn!("{:?} - {:?}", typ, message),
         _ => log::error!("{:?} - {:?}", typ, message),
     }
@@ -217,5 +220,16 @@ impl Drop for Instance {
             }
             self.inner.destroy_instance(None);
         }
+    }
+}
+
+impl fmt::Debug for Instance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Instance")
+            .field("inner", &())
+            .field("debug_report_callback", &())
+            .field("physical_devices_capabilities", &self.physical_devices_capabilities)
+            .field("validation_layers", &self.validation_layers).field("debug_printing", &self.debug_printing)
+            .finish()
     }
 }

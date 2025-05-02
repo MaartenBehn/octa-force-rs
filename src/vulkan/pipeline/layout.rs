@@ -5,6 +5,7 @@ use ash::vk::{self, PushConstantRange};
 
 use crate::{vulkan::device::Device, Context, DescriptorSetLayout};
 
+#[derive(Debug)]
 pub struct PipelineLayout {
     device: Arc<Device>,
     pub(crate) inner: vk::PipelineLayout,

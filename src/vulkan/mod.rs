@@ -10,7 +10,7 @@ mod descriptor;
 mod device;
 mod image;
 mod instance;
-mod physical_device;
+pub mod physical_device;
 mod pipeline;
 mod query;
 mod queue;

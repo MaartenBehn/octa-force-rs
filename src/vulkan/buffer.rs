@@ -13,6 +13,7 @@ use gpu_allocator::{
     MemoryLocation,
 };
 
+#[derive(Debug)]
 pub struct Buffer {
     device: Arc<Device>,
     allocator: Arc<Mutex<Allocator>>,

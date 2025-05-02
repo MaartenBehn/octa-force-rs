@@ -5,6 +5,7 @@ use ash::vk;
 
 use crate::{vulkan::device::Device, Context, PipelineLayout, ShaderModule};
 
+#[derive(Debug)]
 pub struct ComputePipeline {
     device: Arc<Device>,
     pub(crate) inner: vk::Pipeline,

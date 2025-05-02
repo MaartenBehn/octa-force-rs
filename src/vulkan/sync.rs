@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::{vulkan::device::Device, Context};
 
+#[derive(Debug)]
 pub struct Semaphore {
     device: Arc<Device>,
     pub(crate) inner: vk::Semaphore,
@@ -32,6 +33,7 @@ impl Drop for Semaphore {
     }
 }
 
+#[derive(Debug)]
 pub struct Fence {
     device: Arc<Device>,
     pub(crate) inner: vk::Fence,

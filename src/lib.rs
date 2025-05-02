@@ -48,6 +48,7 @@ struct GlobalContainer<B: BindingTrait> {
     pub dropped_render_state: Vec<B::RenderState>,
 }
 
+#[derive(Debug)]
 struct ActiveContainer<B: BindingTrait> {
     pub render_state: B::RenderState,
 
@@ -63,6 +64,7 @@ struct ActiveContainer<B: BindingTrait> {
 pub fn run<B: BindingTrait>(engine_config: EngineConfig) { 
     unsafe {
         env::set_var("RUST_BACKTRACE", "1");
+        //std::env::set_var("WINIT_UNIX_BACKEND", "x11");
     }
 
     let res = log_init();
@@ -123,7 +125,10 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
             &mut self.logic_state); 
          
         if active_container.is_err() {
-            error!("createing ActiveContainer");
+            let mut err = active_container.unwrap_err();
+            err = err.context("When creating Active Container");
+
+            error!("{:?}", err);
             self.active = None;
         } else {
             self.active = Some(active_container.unwrap()); 

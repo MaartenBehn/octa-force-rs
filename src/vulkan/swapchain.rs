@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -303,5 +304,21 @@ impl Swapchain {
 impl Drop for Swapchain {
     fn drop(&mut self) {
         self.destroy();
+    }
+}
+
+impl fmt::Debug for Swapchain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Swapchain")
+            .field("device", &self.device)
+            .field("inner", &())
+            .field("swapchain_khr", &self.swapchain_khr)
+            .field("size", &self.size)
+            .field("format", &self.format)
+            .field("depth_format", &self.depth_format)
+            .field("color_space", &self.color_space)
+            .field("present_mode", &self.present_mode)
+            .field("images_and_views", &self.images_and_views)
+            .field("depht_images_and_views", &self.images_and_views).finish()
     }
 }

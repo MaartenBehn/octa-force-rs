@@ -5,6 +5,7 @@ use ash::vk;
 
 use crate::{Context, Device};
 
+#[derive(Debug)]
 pub struct TimestampQueryPool<const C: usize> {
     device: Arc<Device>,
     pub(crate) inner: vk::QueryPool,

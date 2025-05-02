@@ -19,14 +19,15 @@ use std::time::Duration;
 use crate::binding::Binding;
 use crate::binding::r#trait::BindingTrait;
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default)]
 pub enum EngineFeatureValue {
+    #[default]
     NotUsed,
     Wanted,
     Needed,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct EngineConfig {
     pub name: String,
     pub start_size: UVec2,
@@ -37,10 +38,17 @@ pub struct EngineConfig {
     pub shader_debug_printing: EngineFeatureValue,
     pub shader_debug_clock: EngineFeatureValue,
     pub gl_ext_scalar_block_layout: EngineFeatureValue,
+    
+    pub required_extensions: Vec<String>,
+    pub wanted_extensions: Vec<String>,
+
+    pub required_device_features: Vec<String>,
+    pub wanted_device_features: Vec<String>,
 
     pub hot_reload_config: Option<HotReloadConfig>
 }
 
+#[derive(Debug)]
 pub struct Engine {
     pub num_frames_in_flight: usize,
     pub num_frames: usize,
@@ -267,13 +275,13 @@ fn create_command_buffers(pool: &CommandPool, swapchain: &Swapchain) -> OctaResu
     pool.allocate_command_buffers(vk::CommandBufferLevel::PRIMARY, swapchain.images_and_views.len() as _)
 }
 
-
-
+#[derive(Debug)]
 pub(crate) struct InFlightFrames {
     per_frames: Vec<PerFrame>,
     current_frame: usize,
 }
 
+#[derive(Debug)]
 struct PerFrame {
     image_available_semaphore: Semaphore,
     render_finished_semaphore: Semaphore,

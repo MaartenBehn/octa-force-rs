@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{fmt, sync::{Arc, Mutex}};
 use anyhow::Result;
 use ash::{vk, Entry};
 use gpu_allocator::{
@@ -49,15 +49,13 @@ impl Context {
         let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;
         
         // Physical Device
-        let mut required_extensions = vec![
-            "VK_KHR_swapchain".to_owned(),
-        ];
+        let mut required_extensions = engine_config.required_extensions.clone();
+        let mut wanted_extensions = engine_config.wanted_extensions.clone();
+        let mut required_device_features = engine_config.required_device_features.clone();
+        let mut wanted_device_features = engine_config.wanted_device_features.clone();
 
-        let mut wanted_extensions = vec![];
-
-        let mut required_device_features = vec![];
-        let mut wanted_device_features = vec![];
-
+        required_extensions.push("VK_KHR_swapchain".to_owned());
+        
         if cfg!(any(vulkan_1_0, vulkan_1_1, vulkan_1_2)) {
             required_extensions.append(&mut vec![
                 "VK_KHR_dynamic_rendering".to_owned(),
@@ -91,7 +89,6 @@ impl Context {
         if engine_config.shader_debug_printing == EngineFeatureValue::Wanted {
             wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
         } else if engine_config.shader_debug_printing == EngineFeatureValue::Needed {
-            wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
             required_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
         }
         
@@ -102,7 +99,6 @@ impl Context {
                 "deviceClock".to_owned(),
             ]);
         } else if engine_config.shader_debug_clock == EngineFeatureValue::Needed {
-            wanted_extensions.push("VK_KHR_shader_clock".to_owned());
             required_extensions.push("VK_KHR_shader_clock".to_owned());
 
             wanted_device_features.append(&mut vec![
@@ -117,7 +113,6 @@ impl Context {
         if engine_config.gl_ext_scalar_block_layout == EngineFeatureValue::Wanted {
             wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
         } else if engine_config.gl_ext_scalar_block_layout == EngineFeatureValue::Needed {
-            wanted_extensions.push("VK_EXT_scalar_block_layout".to_owned());
             required_extensions.push("VK_EXT_scalar_block_layout".to_owned());
         };
 
@@ -320,3 +315,26 @@ impl Context {
         Ok(executor_result)
     }
 }
+
+impl fmt::Debug for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Context")
+            .field("allocator", &self.allocator)
+            .field("command_pool", &self.command_pool)
+            .field("ray_tracing", &self.ray_tracing)
+            .field("graphics_queue", &self.graphics_queue)
+            .field("present_queue", &self.present_queue)
+            .field("device", &self.device)
+            .field("physical_device", &self.physical_device)
+            .field("surface", &self.surface)
+            .field("instance", &self.instance)
+            .field("debug_printing", &self.debug_printing)
+            .field("shader_clock", &self.shader_clock)
+            .field("_entry", &())
+            //.field("synchronization2", &self.synchronization2)
+            //.field("dynamic_rendering", &self.dynamic_rendering)
+            .finish()
+    }
+}
+
+

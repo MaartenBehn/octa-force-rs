@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
+use convert_case::{Case, Casing};
 
 use anyhow::{bail, Result};
 use ash::{vk};
-use ash::vk::{Format, FormatFeatureFlags, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceShaderClockFeaturesKHR, PhysicalDeviceType, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
+use ash::vk::{Format, FormatFeatureFlags, PhysicalDevice8BitStorageFeatures, PhysicalDeviceAccelerationStructureFeaturesKHR, PhysicalDeviceFeatures2, PhysicalDeviceRayTracingPipelineFeaturesKHR, PhysicalDeviceShaderClockFeaturesKHR, PhysicalDeviceType, PhysicalDeviceVulkan11Features, PhysicalDeviceVulkan12Features, PhysicalDeviceVulkan13Features, PresentModeKHR, SurfaceFormatKHR};
 use log::error;
 use crate::{vulkan::queue::QueueFamily, vulkan::surface::Surface};
 use crate::vulkan::instance::Instance;
@@ -451,13 +452,15 @@ impl PhysicalDeviceCapabilities {
         }
         
         // Device Features
-        let mut required_features = PhysicalDeviceFeatures::new(required_device_features);
-        unsafe { instance.inner.get_physical_device_features2(inner, &mut required_features.vulkan_features()) };
-        let (required_device_features_ok, required_device_features) = required_features.result(required_device_features);
+        let required_features = PhysicalDeviceFeatures::new(required_device_features);
+        let mut res_required_features = required_features.to_owned();
+        unsafe { instance.inner.get_physical_device_features2(inner, &mut res_required_features.vulkan_features()) };
+        let (required_device_features_ok, required_device_features) = res_required_features.get_mask_result(&required_features);
 
         let mut wanted_features = PhysicalDeviceFeatures::new(wanted_device_features);
-        unsafe { instance.inner.get_physical_device_features2(inner, &mut wanted_features.vulkan_features()) };
-        let (wanted_device_features_ok, wanted_device_features) = wanted_features.result(wanted_device_features);
+        let mut res_wanted_features = required_features.to_owned();
+        unsafe { instance.inner.get_physical_device_features2(inner, &mut res_wanted_features.vulkan_features()) };
+        let (wanted_device_features_ok, wanted_device_features) = res_wanted_features.get_mask_result(&wanted_features);
 
         Ok(Self {
             inner,
@@ -493,34 +496,46 @@ impl PhysicalDeviceCapabilities {
     }
 }
 
-pub(crate) struct PhysicalDeviceFeatures<'a> {
-    pub(crate) features: vk::PhysicalDeviceFeatures,
-    pub(crate) ray_tracing_feature: PhysicalDeviceRayTracingPipelineFeaturesKHR<'a>,
-    pub(crate) acceleration_struct_feature: PhysicalDeviceAccelerationStructureFeaturesKHR<'a>,
-    pub(crate) features12: PhysicalDeviceVulkan12Features<'a>,
-    pub(crate) features13: PhysicalDeviceVulkan13Features<'a>,
-    pub(crate) clock_feature: PhysicalDeviceShaderClockFeaturesKHR<'a>,
+#[derive(Default, Clone, Copy)]
+pub struct PhysicalDeviceFeatures<'a> {
+    pub features: vk::PhysicalDeviceFeatures,
+    pub ray_tracing_feature: PhysicalDeviceRayTracingPipelineFeaturesKHR<'a>,
+    pub acceleration_struct_feature: PhysicalDeviceAccelerationStructureFeaturesKHR<'a>,
+    pub features11: PhysicalDeviceVulkan11Features<'a>,
+    pub features12: PhysicalDeviceVulkan12Features<'a>,
+    pub features13: PhysicalDeviceVulkan13Features<'a>,
+    pub clock_feature: PhysicalDeviceShaderClockFeaturesKHR<'a>,
+    pub storage8_features: PhysicalDevice8BitStorageFeatures<'a>
 }
 
-impl<'a> PhysicalDeviceFeatures<'a> {
-    pub(crate) fn new(required_device_features: &[String]) -> PhysicalDeviceFeatures {
-        let mut required_features: HashSet<_> = required_device_features.iter().collect();
-        let features = vk::PhysicalDeviceFeatures::default()
-            .shader_int64(required_features.take(&"int64".to_owned()).is_some());
+#[macro_export]
+macro_rules! any_used {
+    ( $self:ident, $feature:ident, $( pub $x:ident : Bool32 ),* $(,)? ) => {
+        {
+            let mut used = false;
+            $(
+                used |= ($self.$feature.$x == ash::vk::TRUE);
+            )*
+            used
+        }
+    };
+}
 
 #[macro_export]
 macro_rules! get_mask_result {
     ( $self:ident, $other:ident : $( $feature:ident, $( pub $x:ident : Bool32 ),* $(,)? ):* $(:)? ) => {
         {
             let mut res: HashMap<String, bool> = HashMap::new(); 
+            let mut ok = true;
             $(
                 $(
                     if $other.$feature.$x == ash::vk::TRUE {
-                        res.insert(format!("{}",  stringify!($x)), $self.$feature.$x == ash::vk::TRUE);
+                        res.insert(format!("{}",  stringify!($x).to_case(Case::Camel)), $self.$feature.$x == ash::vk::TRUE);
+                        ok &= $self.$feature.$x == ash::vk::TRUE;
                     }
                 )*
             )*
-            res
+            (ok, res)
         }
     };
 }
@@ -531,45 +546,150 @@ macro_rules! set_from_list {
         {
             $(
                 $(
-                    $self.$feature.$x($list.take(&format!("{}",  stringify!($x).to_owned())).is_some());
+                   $self.$feature = $self.$feature.$x($list.take(&format!("{}", stringify!($x).to_case(Case::Camel))).is_some());
                 )*
             )*
         }
-
-        (all, result)
     }
+}
+
+impl<'a> PhysicalDeviceFeatures<'a> {
 
     pub(crate) fn vulkan_features(&mut self) -> PhysicalDeviceFeatures2{
-        let mut builder = PhysicalDeviceFeatures2::default()
+        let mut res = PhysicalDeviceFeatures2::default()
             .features(self.features);
 
-        if (self.features12.runtime_descriptor_array | self.features12.buffer_device_address) == vk::TRUE {
-            builder = builder.push_next(&mut self.features12);
+        if any_used!(self, features11,
+    pub storage_buffer16_bit_access: Bool32,
+    pub uniform_and_storage_buffer16_bit_access: Bool32,
+    pub storage_push_constant16: Bool32,
+    pub storage_input_output16: Bool32,
+    pub multiview: Bool32,
+    pub multiview_geometry_shader: Bool32,
+    pub multiview_tessellation_shader: Bool32,
+    pub variable_pointers_storage_buffer: Bool32,
+    pub variable_pointers: Bool32,
+    pub protected_memory: Bool32,
+    pub sampler_ycbcr_conversion: Bool32,
+    pub shader_draw_parameters: Bool32,
+        ) {
+            res = res.push_next(&mut self.features11);
         }
 
-        if (self.features13.dynamic_rendering | self.features13.synchronization2) == vk::TRUE {
-            builder = builder.push_next(&mut self.features13);
+        if any_used!(self, features12,
+    pub sampler_mirror_clamp_to_edge: Bool32,
+    pub draw_indirect_count: Bool32,
+    pub storage_buffer8_bit_access: Bool32,
+    pub uniform_and_storage_buffer8_bit_access: Bool32,
+    pub storage_push_constant8: Bool32,
+    pub shader_buffer_int64_atomics: Bool32,
+    pub shader_shared_int64_atomics: Bool32,
+    pub shader_float16: Bool32,
+    pub shader_int8: Bool32,
+    pub descriptor_indexing: Bool32,
+    pub shader_input_attachment_array_dynamic_indexing: Bool32,
+    pub shader_uniform_texel_buffer_array_dynamic_indexing: Bool32,
+    pub shader_storage_texel_buffer_array_dynamic_indexing: Bool32,
+    pub shader_uniform_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_sampled_image_array_non_uniform_indexing: Bool32,
+    pub shader_storage_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_storage_image_array_non_uniform_indexing: Bool32,
+    pub shader_input_attachment_array_non_uniform_indexing: Bool32,
+    pub shader_uniform_texel_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_storage_texel_buffer_array_non_uniform_indexing: Bool32,
+    pub descriptor_binding_uniform_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_sampled_image_update_after_bind: Bool32,
+    pub descriptor_binding_storage_image_update_after_bind: Bool32,
+    pub descriptor_binding_storage_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_uniform_texel_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_storage_texel_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_update_unused_while_pending: Bool32,
+    pub descriptor_binding_partially_bound: Bool32,
+    pub descriptor_binding_variable_descriptor_count: Bool32,
+    pub runtime_descriptor_array: Bool32,
+    pub sampler_filter_minmax: Bool32,
+    pub scalar_block_layout: Bool32,
+    pub imageless_framebuffer: Bool32,
+    pub uniform_buffer_standard_layout: Bool32,
+    pub shader_subgroup_extended_types: Bool32,
+    pub separate_depth_stencil_layouts: Bool32,
+    pub host_query_reset: Bool32,
+    pub timeline_semaphore: Bool32,
+    pub buffer_device_address: Bool32,
+    pub buffer_device_address_capture_replay: Bool32,
+    pub buffer_device_address_multi_device: Bool32,
+    pub vulkan_memory_model: Bool32,
+    pub vulkan_memory_model_device_scope: Bool32,
+    pub vulkan_memory_model_availability_visibility_chains: Bool32,
+    pub shader_output_viewport_index: Bool32,
+    pub shader_output_layer: Bool32,
+    pub subgroup_broadcast_dynamic_id: Bool32, 
+        ) {
+            res = res.push_next(&mut self.features12);
         }
 
-        if (self.clock_feature.shader_device_clock | self.clock_feature.shader_subgroup_clock) == vk::TRUE {
-            builder = builder.push_next(&mut self.clock_feature);
+        if any_used!(self, features13,
+    pub robust_image_access: Bool32,
+    pub inline_uniform_block: Bool32,
+    pub descriptor_binding_inline_uniform_block_update_after_bind: Bool32,
+    pub pipeline_creation_cache_control: Bool32,
+    pub private_data: Bool32,
+    pub shader_demote_to_helper_invocation: Bool32,
+    pub shader_terminate_invocation: Bool32,
+    pub subgroup_size_control: Bool32,
+    pub compute_full_subgroups: Bool32,
+    pub synchronization2: Bool32,
+    pub texture_compression_astc_hdr: Bool32,
+    pub shader_zero_initialize_workgroup_memory: Bool32,
+    pub dynamic_rendering: Bool32,
+    pub shader_integer_dot_product: Bool32,
+    pub maintenance4: Bool32,
+        ) {
+            res = res.push_next(&mut self.features13);
+        }
+        
+        if any_used!(self, clock_feature,
+    pub shader_subgroup_clock: Bool32,
+    pub shader_device_clock: Bool32,
+        ) {
+            res = res.push_next(&mut self.clock_feature);
         }
 
-        if (self.ray_tracing_feature.ray_tracing_pipeline) == vk::TRUE {
-            builder = builder.push_next(&mut self.ray_tracing_feature);
+        if any_used!(self, ray_tracing_feature,
+    pub ray_tracing_pipeline: Bool32,
+    pub ray_tracing_pipeline_shader_group_handle_capture_replay: Bool32,
+    pub ray_tracing_pipeline_shader_group_handle_capture_replay_mixed: Bool32,
+    pub ray_tracing_pipeline_trace_rays_indirect: Bool32,
+    pub ray_traversal_primitive_culling: Bool32,
+        ) {
+            res = res.push_next(&mut self.ray_tracing_feature);
+        }
+        
+        if any_used!(self, acceleration_struct_feature,
+    pub acceleration_structure: Bool32,
+    pub acceleration_structure_capture_replay: Bool32,
+    pub acceleration_structure_indirect_build: Bool32,
+    pub acceleration_structure_host_commands: Bool32,
+    pub descriptor_binding_acceleration_structure_update_after_bind: Bool32,
+        ) {
+            res = res.push_next(&mut self.acceleration_struct_feature);
         }
 
-        if (self.acceleration_struct_feature.acceleration_structure) == vk::TRUE {
-            builder = builder.push_next(&mut self.acceleration_struct_feature);
+        if any_used!(self, storage8_features,
+    pub storage_buffer8_bit_access: Bool32,
+    pub uniform_and_storage_buffer8_bit_access: Bool32,
+    pub storage_push_constant8: Bool32,
+        ) {
+            res = res.push_next(&mut self.storage8_features);
         }
 
-        builder
+        res
     }
 
-    pub fn new(list: &[&str]) -> Self {
+    pub fn new(list: &[String]) -> Self {
         
-        let set: HashSet<_> = list.into_iter().map(|s| s.to_owned()).collect();
-        let res = Self::default();
+        let mut set: HashSet<_> = list.into_iter().map(|s| s.to_owned()).collect();
+        let mut res = Self::default();
 
         set_from_list!(res, set
             :features,
@@ -720,6 +840,10 @@ macro_rules! set_from_list {
             :clock_feature,
     pub shader_subgroup_clock: Bool32,
     pub shader_device_clock: Bool32,
+            :storage8_features,
+    pub storage_buffer8_bit_access: Bool32,
+    pub uniform_and_storage_buffer8_bit_access: Bool32,
+    pub storage_push_constant8: Bool32,
 );  
         if !set.is_empty() {
             error!("Device Feature Check: {:?}, not known!", set);
@@ -728,7 +852,7 @@ macro_rules! set_from_list {
         res
     }
 
-    pub fn get_mask_result(&self, mask: &PhysicalDeviceFeatures) -> HashMap<String, bool> {
+    pub fn get_mask_result(&self, mask: &PhysicalDeviceFeatures) -> (bool, HashMap<String, bool>) {
 
         get_mask_result!(self, mask
             :features,
@@ -879,10 +1003,10 @@ macro_rules! set_from_list {
             :clock_feature,
     pub shader_subgroup_clock: Bool32,
     pub shader_device_clock: Bool32,
+            :storage8_features,
+    pub storage_buffer8_bit_access: Bool32,
+    pub uniform_and_storage_buffer8_bit_access: Bool32,
+    pub storage_push_constant8: Bool32,
 )
     }
 }
-
-
-
-

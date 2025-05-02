@@ -1,3 +1,5 @@
+use core::fmt;
+
 use anyhow::Result;
 use ash::vk::Extent2D;
 use egui::{Context as EguiContext, FullOutput, TextureId, ViewportId};
@@ -99,5 +101,16 @@ impl Gui {
             &primitives)?;
 
         Ok(())
+    }
+}
+
+impl fmt::Debug for Gui {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gui")
+            .field("egui", &self.egui)
+            .field("egui_winit", &())
+            .field("renderer", &())
+            .field("gui_textures_to_free", &self.gui_textures_to_free)
+            .finish()
     }
 }

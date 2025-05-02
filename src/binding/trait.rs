@@ -1,11 +1,12 @@
+use core::fmt;
 use std::time::Duration;
 use ash::vk::AttachmentLoadOp;
 use winit::event::WindowEvent;
 use crate::{Engine, OctaResult};
 
-pub trait BindingTrait {
-    type RenderState;
-    type LogicState;
+pub trait BindingTrait: fmt::Debug {
+    type RenderState: fmt::Debug;
+    type LogicState: fmt::Debug;
     fn new_logic_state() -> OctaResult<Self::LogicState>;
     fn new_render_state(logic_state: &mut Self::LogicState, engine: &mut Engine) -> OctaResult<Self::RenderState>;
 

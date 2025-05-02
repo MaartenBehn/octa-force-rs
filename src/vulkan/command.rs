@@ -12,6 +12,7 @@ use crate::{
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::khr::{DynamicRendering, Synchronization2};
 
+#[derive(Debug)]
 pub struct CommandPool {
     device: Arc<Device>,
     ray_tracing: Option<Arc<RayTracingContext>>,
@@ -137,6 +138,7 @@ impl Drop for CommandPool {
     }
 }
 
+#[derive(Debug)]
 pub struct CommandBuffer {
     device: Arc<Device>,
     ray_tracing: Option<Arc<RayTracingContext>>,

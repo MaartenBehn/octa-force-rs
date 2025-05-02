@@ -1,3 +1,4 @@
+use std::fmt;
 use std::mem::align_of;
 use std::sync::{Arc, Mutex};
 
@@ -12,6 +13,7 @@ use gpu_allocator::{
 use crate::{vulkan::device::Device, Context};
 use crate::vulkan::align::Align;
 
+#[derive(Debug)]
 pub struct Image {
     device: Arc<Device>,
     allocator: Arc<Mutex<Allocator>>,
@@ -22,6 +24,7 @@ pub struct Image {
     is_swapchain: bool, // if set, image should not be destroyed
 }
 
+#[derive(Debug)]
 pub struct ImageView {
     device: Arc<Device>,
     pub(crate) inner: vk::ImageView,
@@ -202,7 +205,9 @@ impl Drop for ImageView {
     }
 }
 
+#[derive(Debug)]
 pub struct ImageAndView {
     pub view: ImageView,
     pub image: Image,
 }
+

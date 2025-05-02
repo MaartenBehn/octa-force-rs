@@ -2,6 +2,8 @@ mod acceleration_structure;
 mod pipeline;
 mod shader_binding_table;
 
+use std::fmt;
+
 pub use acceleration_structure::*;
 pub use pipeline::*;
 pub use shader_binding_table::*;
@@ -122,5 +124,16 @@ impl From<vk::PhysicalDeviceAccelerationStructurePropertiesKHR<'_>>
             min_acceleration_structure_scratch_offset_alignment: p
                 .min_acceleration_structure_scratch_offset_alignment,
         }
+    }
+}
+
+impl fmt::Debug for RayTracingContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RayTracingContext")
+            .field("pipeline_properties", &self.pipeline_properties)
+            .field("pipeline_fn", &())
+            .field("acceleration_structure_properties", &self.acceleration_structure_properties)
+            .field("acceleration_structure_fn", &())
+            .finish()
     }
 }

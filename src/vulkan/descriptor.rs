@@ -5,6 +5,7 @@ use ash::vk;
 
 use crate::vulkan::{device::Device, AccelerationStructure, Buffer, Context, ImageView, Sampler};
 
+#[derive(Debug)]
 pub struct DescriptorSetLayout {
     device: Arc<Device>,
     pub(crate) inner: vk::DescriptorSetLayout,
@@ -32,6 +33,7 @@ impl Drop for DescriptorSetLayout {
     }
 }
 
+#[derive(Debug)]
 pub struct DescriptorPool {
     device: Arc<Device>,
     pub(crate) inner: vk::DescriptorPool,
@@ -87,6 +89,7 @@ impl Drop for DescriptorPool {
     }
 }
 
+#[derive(Debug)]
 pub struct DescriptorSet {
     device: Arc<Device>,
     pub inner: vk::DescriptorSet,
