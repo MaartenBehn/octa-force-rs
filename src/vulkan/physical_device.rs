@@ -67,8 +67,6 @@ pub struct PhysicalDeviceCapabilities {
     pub wanted_device_features_ok: bool,
 }
 
-
-
 impl Instance {
     pub(crate) fn select_suitable_physical_device(
         &mut self,
@@ -510,80 +508,32 @@ impl<'a> PhysicalDeviceFeatures<'a> {
         let features = vk::PhysicalDeviceFeatures::default()
             .shader_int64(required_features.take(&"int64".to_owned()).is_some());
 
-        let ray_tracing_feature = PhysicalDeviceRayTracingPipelineFeaturesKHR::default()
-            .ray_tracing_pipeline(required_features.take(&"rayTracingPipeline".to_owned()).is_some());
+#[macro_export]
+macro_rules! get_mask_result {
+    ( $self:ident, $other:ident : $( $feature:ident, $( pub $x:ident : Bool32 ),* $(,)? ):* $(:)? ) => {
+        {
+            let mut res: HashMap<String, bool> = HashMap::new(); 
+            $(
+                $(
+                    if $other.$feature.$x == ash::vk::TRUE {
+                        res.insert(format!("{}",  stringify!($x)), $self.$feature.$x == ash::vk::TRUE);
+                    }
+                )*
+            )*
+            res
+        }
+    };
+}
 
-        let acceleration_struct_feature = vk::PhysicalDeviceAccelerationStructureFeaturesKHR::default()
-            .acceleration_structure(required_features.take(&"accelerationStructure".to_owned()).is_some());
-
-        let features12 = PhysicalDeviceVulkan12Features::default()
-            .runtime_descriptor_array(required_features.take(&"runtimeDescriptorArray".to_owned()).is_some())
-            .buffer_device_address(required_features.take(&"bufferDeviceAddress".to_owned()).is_some());
-
-        let features13 = PhysicalDeviceVulkan13Features::default()
-            .dynamic_rendering(required_features.take(&"dynamicRendering".to_owned()).is_some())
-            .synchronization2(required_features.take(&"synchronization2".to_owned()).is_some());
-
-        let clock_feature = PhysicalDeviceShaderClockFeaturesKHR::default()
-            .shader_device_clock(required_features.take(&"deviceClock".to_owned()).is_some())
-            .shader_subgroup_clock(false);
-
-        for feature in required_features {
-            log::warn!("Device Feature: {feature} not implemented.");
-        }
-
-        PhysicalDeviceFeatures{features, ray_tracing_feature, acceleration_struct_feature, features12, features13, clock_feature}
-    }
-
-    pub(crate) fn result(&self, required_device_features: &[String]) -> (bool, HashMap<String, bool>) {
-        let mut required_features: HashSet<_> = required_device_features.iter().collect();
-        let mut result = HashMap::new();
-        let mut all = true;
-
-        if required_features.take(&"int64".to_owned()).is_some() {
-            let found = self.features.shader_int64 == vk::TRUE;
-            result.insert("int64".to_owned(), found);
-            all &= found;
-        }
-        if required_features.take(&"rayTracingPipeline".to_owned()).is_some() {
-            let found = self.ray_tracing_feature.ray_tracing_pipeline == vk::TRUE;
-            result.insert("rayTracingPipeline".to_owned(), found);
-            all &= found;
-        }
-        if required_features.take(&"accelerationStructure".to_owned()).is_some() {
-            let found = self.acceleration_struct_feature.acceleration_structure == vk::TRUE;
-            result.insert("accelerationStructure".to_owned(), found);
-            all &= found;
-        }
-        if required_features.take(&"runtimeDescriptorArray".to_owned()).is_some() {
-            let found = self.features12.runtime_descriptor_array == vk::TRUE;
-            result.insert("runtimeDescriptorArray".to_owned(), found);
-            all &= found;
-        }
-        if required_features.take(&"bufferDeviceAddress".to_owned()).is_some() {
-            let found = self.features12.buffer_device_address == vk::TRUE;
-            result.insert("bufferDeviceAddress".to_owned(), found);
-            all &= found;
-        }
-        if required_features.take(&"dynamicRendering".to_owned()).is_some() {
-            let found = self.features13.dynamic_rendering == vk::TRUE;
-            result.insert("dynamicRendering".to_owned(), found);
-            all &= found;
-        }
-        if required_features.take(&"synchronization2".to_owned()).is_some() {
-            let found = self.features13.synchronization2 == vk::TRUE;
-            result.insert("synchronization2".to_owned(), found);
-            all &= found;
-        }
-        if required_features.take(&"deviceClock".to_owned()).is_some() {
-            let found = self.clock_feature.shader_device_clock == vk::TRUE;
-            result.insert("deviceClock".to_owned(), found);
-            all &= found;
-        }
-        
-        if !required_features.is_empty() {
-            error!("Device Feature Check: {:?}, not implemented!", required_features);
-            unimplemented!()
+#[macro_export]
+macro_rules! set_from_list {
+    ( $self:ident, $list:ident : $( $feature:ident, $( pub $x:ident : Bool32 ),* $(,)? ):* $(:)? ) => {
+        {
+            $(
+                $(
+                    $self.$feature.$x($list.take(&format!("{}",  stringify!($x).to_owned())).is_some());
+                )*
+            )*
         }
 
         (all, result)
@@ -615,7 +565,324 @@ impl<'a> PhysicalDeviceFeatures<'a> {
 
         builder
     }
+
+    pub fn new(list: &[&str]) -> Self {
+        
+        let set: HashSet<_> = list.into_iter().map(|s| s.to_owned()).collect();
+        let res = Self::default();
+
+        set_from_list!(res, set
+            :features,
+    pub robust_buffer_access: Bool32,
+    pub full_draw_index_uint32: Bool32,
+    pub image_cube_array: Bool32,
+    pub independent_blend: Bool32,
+    pub geometry_shader: Bool32,
+    pub tessellation_shader: Bool32,
+    pub sample_rate_shading: Bool32,
+    pub dual_src_blend: Bool32,
+    pub logic_op: Bool32,
+    pub multi_draw_indirect: Bool32,
+    pub draw_indirect_first_instance: Bool32,
+    pub depth_clamp: Bool32,
+    pub depth_bias_clamp: Bool32,
+    pub fill_mode_non_solid: Bool32,
+    pub depth_bounds: Bool32,
+    pub wide_lines: Bool32,
+    pub large_points: Bool32,
+    pub alpha_to_one: Bool32,
+    pub multi_viewport: Bool32,
+    pub sampler_anisotropy: Bool32,
+    pub texture_compression_etc2: Bool32,
+    pub texture_compression_astc_ldr: Bool32,
+    pub texture_compression_bc: Bool32,
+    pub occlusion_query_precise: Bool32,
+    pub pipeline_statistics_query: Bool32,
+    pub vertex_pipeline_stores_and_atomics: Bool32,
+    pub fragment_stores_and_atomics: Bool32,
+    pub shader_tessellation_and_geometry_point_size: Bool32,
+    pub shader_image_gather_extended: Bool32,
+    pub shader_storage_image_extended_formats: Bool32,
+    pub shader_storage_image_multisample: Bool32,
+    pub shader_storage_image_read_without_format: Bool32,
+    pub shader_storage_image_write_without_format: Bool32,
+    pub shader_uniform_buffer_array_dynamic_indexing: Bool32,
+    pub shader_sampled_image_array_dynamic_indexing: Bool32,
+    pub shader_storage_buffer_array_dynamic_indexing: Bool32,
+    pub shader_storage_image_array_dynamic_indexing: Bool32,
+    pub shader_clip_distance: Bool32,
+    pub shader_cull_distance: Bool32,
+    pub shader_float64: Bool32,
+    pub shader_int64: Bool32,
+    pub shader_int16: Bool32,
+    pub shader_resource_residency: Bool32,
+    pub shader_resource_min_lod: Bool32,
+    pub sparse_binding: Bool32,
+    pub sparse_residency_buffer: Bool32,
+    pub sparse_residency_image2_d: Bool32,
+    pub sparse_residency_image3_d: Bool32,
+    pub sparse_residency2_samples: Bool32,
+    pub sparse_residency4_samples: Bool32,
+    pub sparse_residency8_samples: Bool32,
+    pub sparse_residency16_samples: Bool32,
+    pub sparse_residency_aliased: Bool32,
+    pub variable_multisample_rate: Bool32,
+    pub inherited_queries: Bool32,
+            :features11,
+    pub storage_buffer16_bit_access: Bool32,
+    pub uniform_and_storage_buffer16_bit_access: Bool32,
+    pub storage_push_constant16: Bool32,
+    pub storage_input_output16: Bool32,
+    pub multiview: Bool32,
+    pub multiview_geometry_shader: Bool32,
+    pub multiview_tessellation_shader: Bool32,
+    pub variable_pointers_storage_buffer: Bool32,
+    pub variable_pointers: Bool32,
+    pub protected_memory: Bool32,
+    pub sampler_ycbcr_conversion: Bool32,
+    pub shader_draw_parameters: Bool32,
+            :features12,
+    pub sampler_mirror_clamp_to_edge: Bool32,
+    pub draw_indirect_count: Bool32,
+    pub storage_buffer8_bit_access: Bool32,
+    pub uniform_and_storage_buffer8_bit_access: Bool32,
+    pub storage_push_constant8: Bool32,
+    pub shader_buffer_int64_atomics: Bool32,
+    pub shader_shared_int64_atomics: Bool32,
+    pub shader_float16: Bool32,
+    pub shader_int8: Bool32,
+    pub descriptor_indexing: Bool32,
+    pub shader_input_attachment_array_dynamic_indexing: Bool32,
+    pub shader_uniform_texel_buffer_array_dynamic_indexing: Bool32,
+    pub shader_storage_texel_buffer_array_dynamic_indexing: Bool32,
+    pub shader_uniform_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_sampled_image_array_non_uniform_indexing: Bool32,
+    pub shader_storage_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_storage_image_array_non_uniform_indexing: Bool32,
+    pub shader_input_attachment_array_non_uniform_indexing: Bool32,
+    pub shader_uniform_texel_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_storage_texel_buffer_array_non_uniform_indexing: Bool32,
+    pub descriptor_binding_uniform_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_sampled_image_update_after_bind: Bool32,
+    pub descriptor_binding_storage_image_update_after_bind: Bool32,
+    pub descriptor_binding_storage_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_uniform_texel_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_storage_texel_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_update_unused_while_pending: Bool32,
+    pub descriptor_binding_partially_bound: Bool32,
+    pub descriptor_binding_variable_descriptor_count: Bool32,
+    pub runtime_descriptor_array: Bool32,
+    pub sampler_filter_minmax: Bool32,
+    pub scalar_block_layout: Bool32,
+    pub imageless_framebuffer: Bool32,
+    pub uniform_buffer_standard_layout: Bool32,
+    pub shader_subgroup_extended_types: Bool32,
+    pub separate_depth_stencil_layouts: Bool32,
+    pub host_query_reset: Bool32,
+    pub timeline_semaphore: Bool32,
+    pub buffer_device_address: Bool32,
+    pub buffer_device_address_capture_replay: Bool32,
+    pub buffer_device_address_multi_device: Bool32,
+    pub vulkan_memory_model: Bool32,
+    pub vulkan_memory_model_device_scope: Bool32,
+    pub vulkan_memory_model_availability_visibility_chains: Bool32,
+    pub shader_output_viewport_index: Bool32,
+    pub shader_output_layer: Bool32,
+    pub subgroup_broadcast_dynamic_id: Bool32,
+            :features13,
+    pub robust_image_access: Bool32,
+    pub inline_uniform_block: Bool32,
+    pub descriptor_binding_inline_uniform_block_update_after_bind: Bool32,
+    pub pipeline_creation_cache_control: Bool32,
+    pub private_data: Bool32,
+    pub shader_demote_to_helper_invocation: Bool32,
+    pub shader_terminate_invocation: Bool32,
+    pub subgroup_size_control: Bool32,
+    pub compute_full_subgroups: Bool32,
+    pub synchronization2: Bool32,
+    pub texture_compression_astc_hdr: Bool32,
+    pub shader_zero_initialize_workgroup_memory: Bool32,
+    pub dynamic_rendering: Bool32,
+    pub shader_integer_dot_product: Bool32,
+    pub maintenance4: Bool32,
+            :ray_tracing_feature,
+    pub ray_tracing_pipeline: Bool32,
+    pub ray_tracing_pipeline_shader_group_handle_capture_replay: Bool32,
+    pub ray_tracing_pipeline_shader_group_handle_capture_replay_mixed: Bool32,
+    pub ray_tracing_pipeline_trace_rays_indirect: Bool32,
+    pub ray_traversal_primitive_culling: Bool32,
+            :acceleration_struct_feature,
+    pub acceleration_structure: Bool32,
+    pub acceleration_structure_capture_replay: Bool32,
+    pub acceleration_structure_indirect_build: Bool32,
+    pub acceleration_structure_host_commands: Bool32,
+    pub descriptor_binding_acceleration_structure_update_after_bind: Bool32,
+            :clock_feature,
+    pub shader_subgroup_clock: Bool32,
+    pub shader_device_clock: Bool32,
+);  
+        if !set.is_empty() {
+            error!("Device Feature Check: {:?}, not known!", set);
+            panic!()
+        }
+        res
+    }
+
+    pub fn get_mask_result(&self, mask: &PhysicalDeviceFeatures) -> HashMap<String, bool> {
+
+        get_mask_result!(self, mask
+            :features,
+    pub robust_buffer_access: Bool32,
+    pub full_draw_index_uint32: Bool32,
+    pub image_cube_array: Bool32,
+    pub independent_blend: Bool32,
+    pub geometry_shader: Bool32,
+    pub tessellation_shader: Bool32,
+    pub sample_rate_shading: Bool32,
+    pub dual_src_blend: Bool32,
+    pub logic_op: Bool32,
+    pub multi_draw_indirect: Bool32,
+    pub draw_indirect_first_instance: Bool32,
+    pub depth_clamp: Bool32,
+    pub depth_bias_clamp: Bool32,
+    pub fill_mode_non_solid: Bool32,
+    pub depth_bounds: Bool32,
+    pub wide_lines: Bool32,
+    pub large_points: Bool32,
+    pub alpha_to_one: Bool32,
+    pub multi_viewport: Bool32,
+    pub sampler_anisotropy: Bool32,
+    pub texture_compression_etc2: Bool32,
+    pub texture_compression_astc_ldr: Bool32,
+    pub texture_compression_bc: Bool32,
+    pub occlusion_query_precise: Bool32,
+    pub pipeline_statistics_query: Bool32,
+    pub vertex_pipeline_stores_and_atomics: Bool32,
+    pub fragment_stores_and_atomics: Bool32,
+    pub shader_tessellation_and_geometry_point_size: Bool32,
+    pub shader_image_gather_extended: Bool32,
+    pub shader_storage_image_extended_formats: Bool32,
+    pub shader_storage_image_multisample: Bool32,
+    pub shader_storage_image_read_without_format: Bool32,
+    pub shader_storage_image_write_without_format: Bool32,
+    pub shader_uniform_buffer_array_dynamic_indexing: Bool32,
+    pub shader_sampled_image_array_dynamic_indexing: Bool32,
+    pub shader_storage_buffer_array_dynamic_indexing: Bool32,
+    pub shader_storage_image_array_dynamic_indexing: Bool32,
+    pub shader_clip_distance: Bool32,
+    pub shader_cull_distance: Bool32,
+    pub shader_float64: Bool32,
+    pub shader_int64: Bool32,
+    pub shader_int16: Bool32,
+    pub shader_resource_residency: Bool32,
+    pub shader_resource_min_lod: Bool32,
+    pub sparse_binding: Bool32,
+    pub sparse_residency_buffer: Bool32,
+    pub sparse_residency_image2_d: Bool32,
+    pub sparse_residency_image3_d: Bool32,
+    pub sparse_residency2_samples: Bool32,
+    pub sparse_residency4_samples: Bool32,
+    pub sparse_residency8_samples: Bool32,
+    pub sparse_residency16_samples: Bool32,
+    pub sparse_residency_aliased: Bool32,
+    pub variable_multisample_rate: Bool32,
+    pub inherited_queries: Bool32,
+            :features11,
+    pub storage_buffer16_bit_access: Bool32,
+    pub uniform_and_storage_buffer16_bit_access: Bool32,
+    pub storage_push_constant16: Bool32,
+    pub storage_input_output16: Bool32,
+    pub multiview: Bool32,
+    pub multiview_geometry_shader: Bool32,
+    pub multiview_tessellation_shader: Bool32,
+    pub variable_pointers_storage_buffer: Bool32,
+    pub variable_pointers: Bool32,
+    pub protected_memory: Bool32,
+    pub sampler_ycbcr_conversion: Bool32,
+    pub shader_draw_parameters: Bool32,
+            :features12,
+    pub sampler_mirror_clamp_to_edge: Bool32,
+    pub draw_indirect_count: Bool32,
+    pub storage_buffer8_bit_access: Bool32,
+    pub uniform_and_storage_buffer8_bit_access: Bool32,
+    pub storage_push_constant8: Bool32,
+    pub shader_buffer_int64_atomics: Bool32,
+    pub shader_shared_int64_atomics: Bool32,
+    pub shader_float16: Bool32,
+    pub shader_int8: Bool32,
+    pub descriptor_indexing: Bool32,
+    pub shader_input_attachment_array_dynamic_indexing: Bool32,
+    pub shader_uniform_texel_buffer_array_dynamic_indexing: Bool32,
+    pub shader_storage_texel_buffer_array_dynamic_indexing: Bool32,
+    pub shader_uniform_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_sampled_image_array_non_uniform_indexing: Bool32,
+    pub shader_storage_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_storage_image_array_non_uniform_indexing: Bool32,
+    pub shader_input_attachment_array_non_uniform_indexing: Bool32,
+    pub shader_uniform_texel_buffer_array_non_uniform_indexing: Bool32,
+    pub shader_storage_texel_buffer_array_non_uniform_indexing: Bool32,
+    pub descriptor_binding_uniform_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_sampled_image_update_after_bind: Bool32,
+    pub descriptor_binding_storage_image_update_after_bind: Bool32,
+    pub descriptor_binding_storage_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_uniform_texel_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_storage_texel_buffer_update_after_bind: Bool32,
+    pub descriptor_binding_update_unused_while_pending: Bool32,
+    pub descriptor_binding_partially_bound: Bool32,
+    pub descriptor_binding_variable_descriptor_count: Bool32,
+    pub runtime_descriptor_array: Bool32,
+    pub sampler_filter_minmax: Bool32,
+    pub scalar_block_layout: Bool32,
+    pub imageless_framebuffer: Bool32,
+    pub uniform_buffer_standard_layout: Bool32,
+    pub shader_subgroup_extended_types: Bool32,
+    pub separate_depth_stencil_layouts: Bool32,
+    pub host_query_reset: Bool32,
+    pub timeline_semaphore: Bool32,
+    pub buffer_device_address: Bool32,
+    pub buffer_device_address_capture_replay: Bool32,
+    pub buffer_device_address_multi_device: Bool32,
+    pub vulkan_memory_model: Bool32,
+    pub vulkan_memory_model_device_scope: Bool32,
+    pub vulkan_memory_model_availability_visibility_chains: Bool32,
+    pub shader_output_viewport_index: Bool32,
+    pub shader_output_layer: Bool32,
+    pub subgroup_broadcast_dynamic_id: Bool32,
+            :features13,
+    pub robust_image_access: Bool32,
+    pub inline_uniform_block: Bool32,
+    pub descriptor_binding_inline_uniform_block_update_after_bind: Bool32,
+    pub pipeline_creation_cache_control: Bool32,
+    pub private_data: Bool32,
+    pub shader_demote_to_helper_invocation: Bool32,
+    pub shader_terminate_invocation: Bool32,
+    pub subgroup_size_control: Bool32,
+    pub compute_full_subgroups: Bool32,
+    pub synchronization2: Bool32,
+    pub texture_compression_astc_hdr: Bool32,
+    pub shader_zero_initialize_workgroup_memory: Bool32,
+    pub dynamic_rendering: Bool32,
+    pub shader_integer_dot_product: Bool32,
+    pub maintenance4: Bool32,
+            :ray_tracing_feature,
+    pub ray_tracing_pipeline: Bool32,
+    pub ray_tracing_pipeline_shader_group_handle_capture_replay: Bool32,
+    pub ray_tracing_pipeline_shader_group_handle_capture_replay_mixed: Bool32,
+    pub ray_tracing_pipeline_trace_rays_indirect: Bool32,
+    pub ray_traversal_primitive_culling: Bool32,
+            :acceleration_struct_feature,
+    pub acceleration_structure: Bool32,
+    pub acceleration_structure_capture_replay: Bool32,
+    pub acceleration_structure_indirect_build: Bool32,
+    pub acceleration_structure_host_commands: Bool32,
+    pub descriptor_binding_acceleration_structure_update_after_bind: Bool32,
+            :clock_feature,
+    pub shader_subgroup_clock: Bool32,
+    pub shader_device_clock: Bool32,
+)
+    }
 }
+
 
 
 
