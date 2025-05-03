@@ -1,14 +1,18 @@
 { pkgs ? ( import <nixpkgs> {}), ... }:
 
-pkgs.mkShell {
+let 
+  rustc_version = "stable";
+in pkgs.mkShell {
 
   name = "octa-force";
-  RUSTC_VERSION = "stable";
+
   shellHook = ''
     export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
-    export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$RUSTC_VERSION-x86_64-unknown-linux-gnu/bin/
-    export RUSTUP_TOOLCHAIN=$RUSTC_VERSION-x86_64-unknown-linux-gnu
+    export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$${rustc_version}-x86_64-unknown-linux-gnu/bin/
   '';
+
+  RUSTC_VERSION = rustc_version;
+  RUSTUP_TOOLCHAIN="${rustc_version}-x86_64-unknown-linux-gnu";
 
   packages = with pkgs; [
     rustup

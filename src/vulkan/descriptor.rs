@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use ash::vk;
+use ash::vk::{self, DescriptorSetLayoutBindingFlagsCreateInfo};
 
 use crate::vulkan::{device::Device, AccelerationStructure, Buffer, Context, ImageView, Sampler};
 
@@ -15,8 +15,15 @@ impl DescriptorSetLayout {
     pub(crate) fn new(
         device: Arc<Device>,
         bindings: &[vk::DescriptorSetLayoutBinding],
+        binding_flags: &[vk::DescriptorBindingFlags]
     ) -> Result<Self> {
-        let dsl_info = vk::DescriptorSetLayoutCreateInfo::default().bindings(bindings);
+        let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default()
+            .binding_flags(binding_flags);
+
+        let dsl_info = vk::DescriptorSetLayoutCreateInfo::default()
+            .bindings(bindings)
+            .push_next(&mut binding_flags);
+
         let inner = unsafe { device.inner.create_descriptor_set_layout(&dsl_info, None)? };
 
         Ok(Self { device, inner })
@@ -44,10 +51,12 @@ impl DescriptorPool {
         device: Arc<Device>,
         max_sets: u32,
         pool_sizes: &[vk::DescriptorPoolSize],
+        flags: vk::DescriptorPoolCreateFlags,
     ) -> Result<Self> {
         let pool_info = vk::DescriptorPoolCreateInfo::default()
             .max_sets(max_sets)
-            .pool_sizes(pool_sizes);
+            .pool_sizes(pool_sizes)
+            .flags(flags);
         let inner = unsafe { device.inner.create_descriptor_pool(&pool_info, None)? };
 
         Ok(Self { device, inner })
@@ -203,7 +212,7 @@ impl Context {
         &self,
         bindings: &[vk::DescriptorSetLayoutBinding],
     ) -> Result<DescriptorSetLayout> {
-        DescriptorSetLayout::new(self.device.clone(), bindings)
+        DescriptorSetLayout::new(self.device.clone(), bindings, &[])
     }
 
     pub fn create_descriptor_pool(
@@ -211,7 +220,7 @@ impl Context {
         max_sets: u32,
         pool_sizes: &[vk::DescriptorPoolSize],
     ) -> Result<DescriptorPool> {
-        DescriptorPool::new(self.device.clone(), max_sets, pool_sizes)
+        DescriptorPool::new(self.device.clone(), max_sets, pool_sizes, vk::DescriptorPoolCreateFlags::default())
     }
 }
 

@@ -7,6 +7,7 @@ mod buffer;
 mod command;
 mod context;
 mod descriptor;
+mod descriptor_heap;
 mod device;
 mod image;
 mod instance;
