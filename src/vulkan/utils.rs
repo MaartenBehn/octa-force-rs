@@ -56,6 +56,26 @@ impl Context {
         Ok(buffer)
     }
 
+    // Sometimes it would be more performand to reuse the staging buffer
+    pub fn copy_data_to_gpu_only_buffer<T: Copy>(
+        &self,
+        data: &[T],
+        buffer: &Buffer,
+    ) -> Result<()> {
+        let staging_buffer = self.create_buffer(
+            vk::BufferUsageFlags::TRANSFER_SRC,
+            MemoryLocation::CpuToGpu,
+            buffer.size,
+        )?;
+        staging_buffer.copy_data_to_buffer(data)?;
+
+        self.execute_one_time_commands(|cmd_buffer| {
+            cmd_buffer.copy_buffer(&staging_buffer, &buffer);
+        })?;
+
+        Ok(())
+    }
+
     pub fn create_storage_images(
         &self,
         res: UVec2,

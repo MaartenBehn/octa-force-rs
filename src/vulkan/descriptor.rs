@@ -15,6 +15,7 @@ impl DescriptorSetLayout {
     pub(crate) fn new(
         device: Arc<Device>,
         bindings: &[vk::DescriptorSetLayoutBinding],
+        flags: vk::DescriptorSetLayoutCreateFlags, 
         binding_flags: &[vk::DescriptorBindingFlags]
     ) -> Result<Self> {
         let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfo::default()
@@ -22,6 +23,7 @@ impl DescriptorSetLayout {
 
         let dsl_info = vk::DescriptorSetLayoutCreateInfo::default()
             .bindings(bindings)
+            .flags(flags)
             .push_next(&mut binding_flags);
 
         let inner = unsafe { device.inner.create_descriptor_set_layout(&dsl_info, None)? };
@@ -212,7 +214,7 @@ impl Context {
         &self,
         bindings: &[vk::DescriptorSetLayoutBinding],
     ) -> Result<DescriptorSetLayout> {
-        DescriptorSetLayout::new(self.device.clone(), bindings, &[])
+        DescriptorSetLayout::new(self.device.clone(), bindings, vk::DescriptorSetLayoutCreateFlags::empty(), &[])
     }
 
     pub fn create_descriptor_pool(

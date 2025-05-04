@@ -3,7 +3,7 @@ use ash::vk;
 
 use crate::OctaResult;
 
-use super::{Context, DescriptorPool, DescriptorSet, DescriptorSetLayout, Device, ImageAndView, ImageView};
+use super::{Context, DescriptorPool, DescriptorSet, DescriptorSetLayout, Device, ImageAndView, ImageView, Sampler};
 
 #[derive(Debug)]
 pub struct DescriptorHeap {
@@ -30,6 +30,15 @@ impl DescriptorHeap {
             vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND
         )?;
 
+        let sampler_create_info = vk::SamplerCreateInfo::default()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+            .min_lod(0.0)
+            .max_lod(vk::LOD_CLAMP_NONE);
+
+        let sampler = Sampler::new(device.clone(), &sampler_create_info)?;
+
         let (bindings, flags) = heap_types.iter()
             .enumerate()
             .map(|(i, t)| {
@@ -47,7 +56,11 @@ impl DescriptorHeap {
             })
             .collect::<(Vec<_>, Vec<_>)>();
         
-        let layout = DescriptorSetLayout::new(device.clone(), &bindings, &flags)?;
+        let layout = DescriptorSetLayout::new(
+            device.clone(), 
+            &bindings, 
+            vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL,
+            &flags)?;
 
         let set = pool.allocate_set(&layout)?;
       
