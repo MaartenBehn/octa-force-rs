@@ -30,15 +30,6 @@ impl DescriptorHeap {
             vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND
         )?;
 
-        let sampler_create_info = vk::SamplerCreateInfo::default()
-            .mag_filter(vk::Filter::LINEAR)
-            .min_filter(vk::Filter::LINEAR)
-            .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
-            .min_lod(0.0)
-            .max_lod(vk::LOD_CLAMP_NONE);
-
-        let sampler = Sampler::new(device.clone(), &sampler_create_info)?;
-
         let (bindings, flags) = heap_types.iter()
             .enumerate()
             .map(|(i, t)| {

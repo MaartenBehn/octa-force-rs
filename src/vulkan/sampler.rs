@@ -5,6 +5,7 @@ use ash::vk;
 
 use crate::{vulkan::device::Device, Context};
 
+#[derive(Debug, Clone)]
 pub struct Sampler {
     device: Arc<Device>,
     pub(crate) inner: vk::Sampler,

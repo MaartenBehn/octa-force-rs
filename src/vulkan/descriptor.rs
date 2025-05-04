@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk::{self, DescriptorSetLayoutBindingFlagsCreateInfo};
 
-use crate::vulkan::{device::Device, AccelerationStructure, Buffer, Context, ImageView, Sampler};
+use crate::{vulkan::{device::Device, AccelerationStructure, Buffer, Context, ImageView, Sampler}, OctaResult};
 
 #[derive(Debug)]
 pub struct DescriptorSetLayout {
@@ -91,6 +91,28 @@ impl DescriptorPool {
 
     pub fn allocate_set(&self, layout: &DescriptorSetLayout) -> Result<DescriptorSet> {
         Ok(self.allocate_sets(layout, 1)?.into_iter().next().unwrap())
+    }
+
+    pub fn free_sets(
+        &self,
+        sets: &[&DescriptorSet],
+    ) -> Result<()> {
+        let sets = sets.iter().map(|s| s.inner).collect::<Vec<_>>();
+
+        unsafe {
+            self.device
+                .inner
+                .free_descriptor_sets(self.inner, &sets)?
+        };
+
+        Ok(())
+    }
+
+    pub fn free_set(
+        &self, 
+        set: &DescriptorSet,
+    ) -> OctaResult<()> {
+        self.free_sets(&[set])
     }
 }
 
