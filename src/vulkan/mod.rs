@@ -17,7 +17,7 @@ mod query;
 mod queue;
 mod ray_tracing;
 mod sampler;
-mod sampler_pool;
+pub mod sampler_pool;
 mod surface;
 mod swapchain;
 mod sync;

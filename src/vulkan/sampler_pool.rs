@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, fmt::{self, Octal}, rc::Rc, sync::Arc};
 
 use ash::vk::{self, DescriptorPoolSize};
 use egui::emath::OrderedFloat;
@@ -6,8 +6,9 @@ use log::error;
 
 use crate::OctaResult;
 
-use super::{DescriptorPool, DescriptorSet, DescriptorSetLayout, Device};
+use super::{Context, DescriptorPool, DescriptorSet, DescriptorSetLayout, Device};
 
+#[derive(Debug)]
 pub struct SamplerPool {
     device: Arc<Device>,
     pool: Rc<DescriptorPool>,
@@ -34,14 +35,15 @@ struct SamplerConfig {
     pub unnormalized_coordinates: bool,
 }
 
+#[derive(Debug)]
 pub struct SamplerSetHandle {
-    set: DescriptorSet,
-    layout: DescriptorSetLayout,
+    pub set: DescriptorSet,
+    pub layout: DescriptorSetLayout,
     pool: Rc<DescriptorPool>,
 }
 
 impl SamplerPool {
-    pub fn new(device: Arc<Device>, max_num: usize) -> OctaResult<Self> {
+    pub(crate) fn new(device: Arc<Device>, max_num: usize) -> OctaResult<Self> {
         let pool = DescriptorPool::new(
             device.clone(), 
             max_num as _,
@@ -130,6 +132,12 @@ impl SamplerPool {
     }
 }
 
+impl Context {
+    pub fn create_sampler_pool(&self, max_num: usize) -> OctaResult<SamplerPool> {
+       SamplerPool::new(self.device.clone(), max_num) 
+    }
+}
+
 impl Drop for SamplerPool {
     fn drop(&mut self) {
         for (_, sampler) in self.samplers.iter() {
@@ -146,5 +154,28 @@ impl Drop for SamplerSetHandle {
         if res.is_err() {
             error!("Failed to free Descriptor Set: {}", res.unwrap_err());
         }
+    }
+}
+
+impl fmt::Debug for SamplerConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SamplerConfig")
+            .field("flags", &self.flags)
+            .field("mag_filter", &self.mag_filter)
+            .field("min_filter", &self.min_filter)
+            .field("mipmap_mode", &self.mipmap_mode)
+            .field("address_mode_u", &self.address_mode_u)
+            .field("address_mode_v", &self.address_mode_v)
+            .field("address_mode_w", &self.address_mode_w)
+            .field("mip_lod_bias", &self.mip_lod_bias.into_inner())
+            .field("anisotropy_enable", &self.anisotropy_enable)
+            .field("max_anisotropy", &self.max_anisotropy.into_inner())
+            .field("compare_enable", &self.compare_enable)
+            .field("compare_op", &self.compare_op)
+            .field("min_lod", &self.min_lod.into_inner())
+            .field("max_lod", &self.max_lod.into_inner())
+            .field("border_color", &self.border_color)
+            .field("unnormalized_coordinates", &self.unnormalized_coordinates)
+            .finish()
     }
 }

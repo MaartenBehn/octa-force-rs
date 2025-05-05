@@ -3,7 +3,7 @@ use ash::vk;
 
 use crate::OctaResult;
 
-use super::{Context, DescriptorPool, DescriptorSet, DescriptorSetLayout, Device, ImageAndView, ImageView, Sampler};
+use super::{Context, DescriptorPool, DescriptorSet, DescriptorSetLayout, Device, ImageView};
 
 #[derive(Debug)]
 pub struct DescriptorHeap {
@@ -15,8 +15,11 @@ pub struct DescriptorHeap {
     allocator: Rc<RefCell<DescriptorHeapHandleAllocator>>,
 }
 
+pub type DescriptorHandleValue = u32;
+
+#[derive(Debug)]
 pub struct DescriptorHandle {
-    pub value: u32,
+    pub value: DescriptorHandleValue,
     allocator: Rc<RefCell<DescriptorHeapHandleAllocator>>
 }
 
