@@ -1,4 +1,3 @@
-use std::fmt;
 use std::mem::align_of;
 use std::sync::{Arc, Mutex};
 

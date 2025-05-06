@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use ash::vk::{self, DescriptorSetLayoutBindingFlagsCreateInfo};
+use ash::vk;
 
 use crate::{vulkan::{device::Device, AccelerationStructure, Buffer, Context, ImageView, Sampler}, OctaResult};
 
