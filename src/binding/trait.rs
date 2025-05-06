@@ -14,14 +14,12 @@ pub trait BindingTrait: fmt::Debug {
         logic_state: &mut Self::LogicState,
         render_state: &mut Self::RenderState,
         engine: &mut Engine,
-        image_index: usize,
         delta_time: Duration,
     ) -> OctaResult<()>{
         // prevents reports of unused parameters without needing to use #[allow]
         let _ = render_state;
         let _ = logic_state;
         let _ = engine;
-        let _ = image_index;
         let _ = delta_time;
 
         Ok(())
@@ -31,23 +29,21 @@ pub trait BindingTrait: fmt::Debug {
         logic_state: &mut Self::LogicState,
         render_state: &mut Self::RenderState,
         engine: &mut Engine,
-        image_index: usize,
     ) -> OctaResult<()> {
         // prevents reports of unused parameters without needing to use #[allow]
         let _ = render_state;
         let _ = logic_state;
 
         // Render empty Screen
-        let command_buffer = &engine.command_buffers[image_index];
-        let size = engine.swapchain.size;
-        let swap_chain_image = &engine.swapchain.images_and_views[image_index].image;
-        let swap_chain_view = &engine.swapchain.images_and_views[image_index].view;
-        let swap_chain_depth_view = &engine.swapchain.depht_images_and_views[image_index].view;
+        let command_buffer = engine.get_current_command_buffer();
+        let size = engine.get_resolution();
+        let swap_chain_image_and_view = engine.get_current_swapchain_image_and_view();
+        let swap_chain_depth_view = &engine.get_current_depth_image_and_view().view;
 
-        command_buffer.begin_rendering(swap_chain_view, swap_chain_depth_view, size, AttachmentLoadOp::CLEAR, None);
+        command_buffer.begin_rendering(&swap_chain_image_and_view.view, swap_chain_depth_view, size, AttachmentLoadOp::CLEAR, None);
         command_buffer.end_rendering();
 
-        command_buffer.swapchain_image_render_barrier(swap_chain_image)?;
+        command_buffer.swapchain_image_render_barrier(&swap_chain_image_and_view.image)?;
 
         Ok(())
     }

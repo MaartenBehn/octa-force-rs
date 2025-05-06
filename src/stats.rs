@@ -21,18 +21,18 @@ impl StatsDisplayMode {
 }
 
 #[derive(Debug)]
-pub(crate) struct FrameStats {
+pub struct FrameStats {
     // we collect gpu timings the frame after it was computed
     // so we keep frame times for the two last frames
     previous_frame_time: Duration,
-    pub(crate) frame_time: Duration,
+    pub frame_time: Duration,
     previous_compute_time: Duration,
-    pub(crate) compute_time: Duration,
-    pub(crate) gpu_time: Duration,
+    pub compute_time: Duration,
+    pub gpu_time: Duration,
     frame_time_ms_log: Queue<f32>,
     compute_time_ms_log: Queue<f32>,
     gpu_time_ms_log: Queue<f32>,
-    pub(crate) total_frame_count: usize,
+    pub total_frame_count: usize,
     frame_count: usize,
     fps_counter: usize,
     timer: Duration,

@@ -7,15 +7,11 @@ use ash::vk::{ImageUsageFlags};
 use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
 
+use crate::OctaResult;
 use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore};
 use crate::vulkan::Image;
 
 use super::ImageAndView;
-
-pub struct AcquiredImage {
-    pub index: u32,
-    pub is_suboptimal: bool,
-}
 
 pub struct Swapchain {
     device: Arc<Device>,
@@ -28,6 +24,7 @@ pub struct Swapchain {
     pub present_mode: vk::PresentModeKHR,
     pub images_and_views: Vec<ImageAndView>,
     pub depht_images_and_views: Vec<ImageAndView>,
+    pub current_index: usize,
 }
 
 impl Swapchain {
@@ -147,6 +144,7 @@ impl Swapchain {
             present_mode,
             images_and_views,
             depht_images_and_views,
+            current_index: 0,
         })
     }
 
@@ -256,20 +254,25 @@ impl Swapchain {
         Ok(())
     }
 
-    pub fn acquire_next_image(&self, timeout: u64, semaphore: &Semaphore) -> Result<AcquiredImage> {
-        let (index, is_suboptimal) = unsafe {
+    pub fn acquire_next_image(&mut self, timeout: u64, semaphore: &Semaphore) -> OctaResult<bool> {
+        let res = unsafe {
             self.inner.acquire_next_image(
                 self.swapchain_khr,
                 timeout,
                 semaphore.inner,
                 vk::Fence::null(),
-            )?
+            )
         };
 
-        Ok(AcquiredImage {
-            index,
-            is_suboptimal,
-        })
+        self.current_index = match res {
+            Ok((index, .. )) => index as usize,
+            Err(err) => match err {
+                vk::Result::ERROR_OUT_OF_DATE_KHR => return Ok(true),
+                _ => panic!("Error while acquiring next image. Cause: {}", err),
+            },
+        };
+
+        Ok(false)
     }
 
     pub fn queue_present(

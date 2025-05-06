@@ -19,6 +19,7 @@ pub mod utils;
 pub mod hot_reloading;
 pub mod binding;
 pub mod engine;
+pub mod in_flight_frames;
 
 use engine::{Engine, EngineConfig};
 use std::{env, process, thread, time::{Duration, Instant}};
