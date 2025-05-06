@@ -457,7 +457,7 @@ impl PhysicalDeviceCapabilities {
         unsafe { instance.inner.get_physical_device_features2(inner, &mut res_required_features.vulkan_features()) };
         let (required_device_features_ok, required_device_features) = res_required_features.get_mask_result(&required_features);
 
-        let mut wanted_features = PhysicalDeviceFeatures::new(wanted_device_features);
+        let wanted_features = PhysicalDeviceFeatures::new(wanted_device_features);
         let mut res_wanted_features = required_features.to_owned();
         unsafe { instance.inner.get_physical_device_features2(inner, &mut res_wanted_features.vulkan_features()) };
         let (wanted_device_features_ok, wanted_device_features) = res_wanted_features.get_mask_result(&wanted_features);

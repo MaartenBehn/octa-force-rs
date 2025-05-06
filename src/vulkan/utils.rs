@@ -2,7 +2,7 @@ use std::mem::{align_of, size_of_val};
 
 use anyhow::Result;
 use ash::vk;
-use ash::vk::{Format, ImageUsageFlags};
+use ash::vk::ImageUsageFlags;
 use glam::UVec2;
 use gpu_allocator::MemoryLocation;
 

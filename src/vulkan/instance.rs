@@ -6,8 +6,11 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
-use log::{debug, info};
-use raw_window_handle::{HasDisplayHandle, HasRawDisplayHandle};
+use log::info;
+use raw_window_handle::HasDisplayHandle;
+
+#[allow(deprecated)]
+use raw_window_handle::HasRawDisplayHandle;
 
 #[cfg(debug_assertions)]
 use anyhow::bail;
@@ -43,6 +46,7 @@ impl Instance {
             .application_name(app_name.as_c_str())
             .api_version(version.make_api_version());
 
+        #[allow(deprecated)]
         let mut extension_names =
             ash_window::enumerate_required_extensions(display_handle.raw_display_handle()?)?
                 .to_vec();
@@ -169,7 +173,7 @@ unsafe extern "system" fn vulkan_debug_callback(
     typ: vk::DebugUtilsMessageTypeFlagsEXT,
     p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
     _: *mut c_void,
-) -> vk::Bool32 {
+) -> vk::Bool32 { unsafe {
     use vk::DebugUtilsMessageSeverityFlagsEXT as Flag;
 
     let message = CStr::from_ptr((*p_callback_data).p_message);
@@ -180,7 +184,7 @@ unsafe extern "system" fn vulkan_debug_callback(
         _ => log::error!("{:?} - {:?}", typ, message),
     }
     vk::FALSE
-}
+}}
 
 /// Setup the debug message if validation layers are enabled.
 #[allow(dead_code)]
