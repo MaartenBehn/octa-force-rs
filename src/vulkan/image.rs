@@ -84,6 +84,61 @@ impl Image {
         })
     }
 
+    pub(crate) fn new_cube(
+        device: Arc<Device>,
+        allocator: Arc<Mutex<Allocator>>,
+        usage: vk::ImageUsageFlags,
+        memory_location: MemoryLocation,
+        format: vk::Format,
+        width: u32,
+        height: u32,
+    ) -> Result<Self> {
+        let extent = vk::Extent3D {
+            width,
+            height,
+            depth: 1,
+        };
+
+        let image_info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(format)
+            .extent(extent)
+            .array_layers(6)
+            .mip_levels(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(usage)
+            .initial_layout(vk::ImageLayout::UNDEFINED);
+
+        let inner = unsafe { device.inner.create_image(&image_info, None)? };
+        let requirements = unsafe { device.inner.get_image_memory_requirements(inner) };
+
+        let allocation = allocator.lock().unwrap().allocate(&AllocationCreateDesc {
+            name: "image",
+            requirements,
+            location: memory_location,
+            linear: true,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+        })?;
+
+        unsafe {
+            device
+                .inner
+                .bind_image_memory(inner, allocation.memory(), allocation.offset())?
+        };
+
+        Ok(Self {
+            device,
+            allocator,
+            inner,
+            allocation: Some(allocation),
+            format,
+            extent,
+            is_swapchain: false,
+        })
+    }
+
+
     pub(crate) fn from_swapchain_image(
         device: Arc<Device>,
         allocator: Arc<Mutex<Allocator>>,

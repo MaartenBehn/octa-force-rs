@@ -178,10 +178,10 @@ unsafe extern "system" fn vulkan_debug_callback(
 
     let message = CStr::from_ptr((*p_callback_data).p_message);
     match flag {
-        Flag::VERBOSE => log::trace!("{:?} - {:?}", typ, message),
-        Flag::INFO => { log::info!("{:?} - {:?}", typ, message) },
-        Flag::WARNING => log::warn!("{:?} - {:?}", typ, message),
-        _ => log::error!("{:?} - {:?}", typ, message),
+        Flag::VERBOSE => log::trace!("{:?} - {}", typ, message.to_str().unwrap()),
+        Flag::INFO => { log::info!("{:?} - {}", typ, message.to_str().unwrap()) },
+        Flag::WARNING => log::warn!("{:?} - {}", typ, message.to_str().unwrap()),
+        _ => log::error!("{:?} - {} \n", typ, message.to_str().unwrap()),
     }
     vk::FALSE
 }}

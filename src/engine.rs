@@ -3,13 +3,13 @@ use log::{debug, info};
 use winit::window::Window;
 
 use crate::in_flight_frames::InFlightFrames;
-use crate::{Fence, OctaResult, Semaphore, SemaphoreSubmitInfo, TimestampQueryPool};
+use crate::{OctaResult, SemaphoreSubmitInfo};
 use crate::{controls::Controls, gui::Gui, hot_reloading::HotReloadConfig, stats::FrameStats, CommandBuffer, CommandPool, Context, Swapchain};
 
-use crate::stats::{StatsDisplayMode};
+use crate::stats::StatsDisplayMode;
 use ash::vk::{self};
 use winit::{
-    dpi::PhysicalSize, event_loop::ActiveEventLoop, window::{WindowAttributes}
+    dpi::PhysicalSize, event_loop::ActiveEventLoop, window::WindowAttributes
 };
 
 #[cfg(debug_assertions)]

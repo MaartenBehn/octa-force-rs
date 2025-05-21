@@ -8,6 +8,7 @@ pub extern crate egui_ash_renderer;
 pub extern crate egui_winit;
 pub extern crate puffin_egui;
 pub extern crate egui_extras;
+pub extern crate image;
 
 pub mod camera;
 pub mod controls;
