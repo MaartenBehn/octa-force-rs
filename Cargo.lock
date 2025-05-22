@@ -927,6 +927,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d62f07644333c61ff6ab8738366228ea076d6d7e0a6d974385153912a25f22f0"
 
 [[package]]
+name = "free-ranges"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e54d49b03ed4ec4a98c72fb4ecdcce39526226eb1a6515eed16aeba079348c02"
+
+[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1244,6 +1250,15 @@ name = "imgref"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0263a3d970d5c054ed9312c0057b4f3bde9c0b33836d3637361d4a9e6e7a408"
+
+[[package]]
+name = "index-pool"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "488275c105c1582919f14b46585694dd7f3ce1e582a4eb078d5fd578ca332593"
+dependencies = [
+ "free-ranges",
+]
 
 [[package]]
 name = "indexmap"
@@ -2040,6 +2055,7 @@ dependencies = [
  "glam",
  "gpu-allocator",
  "image",
+ "index-pool",
  "libloading",
  "log",
  "notify",

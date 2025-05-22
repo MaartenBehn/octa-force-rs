@@ -14,8 +14,6 @@ use winit::{
 
 #[cfg(debug_assertions)]
 use puffin_egui::puffin;
-#[cfg(debug_assertions)]
-use std::time::Duration;
 
 use crate::binding::Binding;
 use crate::binding::r#trait::BindingTrait;

@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc, usize};
 use ash::vk;
+use index_pool::IndexPool;
+use log::{debug, trace};
 
 use crate::OctaResult;
 
@@ -12,7 +14,7 @@ pub struct DescriptorHeap {
     pub pool: DescriptorPool,
     pub layout: DescriptorSetLayout,
     pub set: DescriptorSet,
-    allocator: Rc<RefCell<DescriptorHeapHandleAllocator>>,
+    allocator: Rc<RefCell<IndexPool>>,
 }
 
 pub type DescriptorHandleValue = u32;
@@ -20,7 +22,7 @@ pub type DescriptorHandleValue = u32;
 #[derive(Debug)]
 pub struct DescriptorHandle {
     pub value: DescriptorHandleValue,
-    allocator: Rc<RefCell<DescriptorHeapHandleAllocator>>
+    allocator: Rc<RefCell<IndexPool>>
 }
 
 impl DescriptorHeap {
@@ -58,7 +60,7 @@ impl DescriptorHeap {
 
         let set = pool.allocate_set(&layout)?;
       
-        let allocator = Rc::new(RefCell::new(DescriptorHeapHandleAllocator::new()));
+        let allocator = Rc::new(RefCell::new(IndexPool::new()));
 
         Ok(Self {
             device,
@@ -71,7 +73,7 @@ impl DescriptorHeap {
     }
 
     pub fn create_image_handle(&mut self, view: &ImageView, usage: vk::ImageUsageFlags) -> OctaResult<DescriptorHandle> {
-        let handle = self.allocator.borrow_mut().alloc();
+        let handle = self.allocator.borrow_mut().new_id() as u32;
 
         let img_info = vk::DescriptorImageInfo::default()
             .image_view(view.inner);
@@ -97,7 +99,8 @@ impl DescriptorHeap {
             let wds = wds.descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
                 .dst_binding(binding_index as _)
                 .image_info(std::slice::from_ref(&img_info));
-
+            
+            trace!("Creating Sampled Image Handle {handle} with usage flags {usage:?} and layout {:?}", img_info.image_layout);
             unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
         } 
 
@@ -112,6 +115,7 @@ impl DescriptorHeap {
                 .dst_binding(binding_index as _)
                 .image_info(std::slice::from_ref(&img_info));
             
+            trace!("Creating Storage Image Handle {handle} with usage flags {usage:?} and layout {:?}", img_info.image_layout);
             unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
         } 
 
@@ -128,46 +132,9 @@ impl Context {
     }
 }
 
-
-#[derive(Debug)]
-pub(crate) struct DescriptorHeapHandleAllocator {
-    next_free_word_id: usize,
-    used_map: Vec<u64>,
-}
-
-impl DescriptorHeapHandleAllocator {
-
-    pub fn new() -> Self {
-        let capacity = 1024 * 64;
-        
-        Self {
-            next_free_word_id: 0,
-            used_map: vec![0; (capacity + 63) / 64],
-        }
-    }
-
-    pub fn alloc(&mut self) -> u32 {
-        for i in 0..self.used_map.len() {
-            let wi = (i + self.next_free_word_id) % self.used_map.len();
-            if self.used_map[wi] != !0 {
-                let j = self.used_map[wi].count_ones();
-                self.used_map[wi] |= 1 << j;
-                self.next_free_word_id = wi;
-            
-                return wi as u32 * 64 + j;
-            }
-        }
-        return !0;
-    }
-    
-    pub fn free(&mut self, addr: u32) {
-        self.used_map[(addr / 64) as usize] &= !(1 << (addr & 63));
-    }
-}
-
-
 impl Drop for DescriptorHandle {
     fn drop(&mut self) {
-        self.allocator.borrow_mut().free(self.value);
+        self.allocator.borrow_mut().return_id(self.value as usize)
+            .expect("Dropped DescriptorHandle with already retured value");
     }
 }

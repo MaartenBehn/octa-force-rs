@@ -88,8 +88,16 @@ impl Context {
         #[cfg(debug_assertions)]
         if engine_config.shader_debug_printing == EngineFeatureValue::Wanted {
             wanted_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
+
+            wanted_device_features.append(&mut vec![
+                "timelineSemaphore".to_owned(),
+            ]);
         } else if engine_config.shader_debug_printing == EngineFeatureValue::Needed {
             required_extensions.push("VK_KHR_shader_non_semantic_info".to_owned());
+
+            required_device_features.append(&mut vec![
+                "timelineSemaphore".to_owned(),
+            ]);
         }
         
         if engine_config.shader_debug_clock == EngineFeatureValue::Wanted {

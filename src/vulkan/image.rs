@@ -8,6 +8,7 @@ use gpu_allocator::{
     vulkan::{Allocation, AllocationCreateDesc, Allocator},
     MemoryLocation,
 };
+use log::{debug, trace};
 
 use crate::{vulkan::device::Device, Context};
 use crate::vulkan::align::Align;
@@ -39,6 +40,8 @@ impl Image {
         width: u32,
         height: u32,
     ) -> Result<Self> {
+        trace!("Creating Image: {width}x{height} with usage flags {usage:?} at memory location {memory_location:?}");
+
         let extent = vk::Extent3D {
             width,
             height,
@@ -84,6 +87,7 @@ impl Image {
         })
     }
 
+    #[allow(dead_code)]
     pub(crate) fn new_cube(
         device: Arc<Device>,
         allocator: Arc<Mutex<Allocator>>,

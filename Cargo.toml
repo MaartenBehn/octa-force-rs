@@ -43,6 +43,9 @@ crc32fast = "1.3.2"
 # Converting device features
 convert_case = "0.8.0"
 
+# Allocator for descriptor_heap
+index-pool = "1.0.11"
+
 
 [build-dependencies]
 ash = { version = "0.38", features = ["linked"] }

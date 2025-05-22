@@ -6,7 +6,7 @@ use crate::{vulkan::{Context, Fence, Semaphore, TimestampQueryPool}, OctaResult}
 
 #[derive(Debug)]
 pub struct InFlightFrames {
-    pub(crate) per_frames: Vec<PerFrame>,
+    per_frames: Vec<PerFrame>,
     pub current_index: usize,
     pub num_frames: usize,
 }
