@@ -130,7 +130,7 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
             let mut err = active_container.unwrap_err();
             err = err.context("When creating Active Container");
 
-            trace!("{:?}", err);
+            error!("{:?}", err);
             self.active = None;
         } else {
             self.active = Some(active_container.unwrap()); 
@@ -188,7 +188,7 @@ impl<B: BindingTrait> GlobalContainer<B> {
                     let err = res.unwrap_err()
                         .context(context.to_string());
 
-                    trace!("{}", err.to_string());
+                    error!("{}", err.to_string());
                     trace!("{}", err.backtrace());
                 }
             },
