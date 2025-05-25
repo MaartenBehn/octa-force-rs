@@ -130,8 +130,7 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
             let mut err = active_container.unwrap_err();
             err = err.context("When creating Active Container");
 
-            error!("{:?}", err);
-            self.active = None;
+            panic!("{:?}", err);
         } else {
             self.active = Some(active_container.unwrap()); 
         }
