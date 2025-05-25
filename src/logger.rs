@@ -5,9 +5,8 @@ use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode, W
 use crate::OctaResult;
 
 pub fn log_init() -> OctaResult<()> {
-    #[cfg(debug_assertions)]
     {
-        let _ = fs::remove_file("trace.log"); 
+        let _ = fs::remove_file("debug.log"); 
         CombinedLogger::init(vec![
             TermLogger::new(
                 LevelFilter::Debug,
@@ -18,11 +17,12 @@ pub fn log_init() -> OctaResult<()> {
             WriteLogger::new(
                 LevelFilter::Debug, 
                 Config::default(), 
-                File::create("trace.log")?
+                File::create("debug.log")?
             ),
         ])?;
     }
 
+    /*
     #[cfg(not(debug_assertions))]
     {
         TermLogger::init(
@@ -32,6 +32,7 @@ pub fn log_init() -> OctaResult<()> {
             ColorChoice::Auto,
         )?; 
     }
+*/
         
     Ok(())
 }
