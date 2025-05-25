@@ -191,7 +191,7 @@ impl<B: BindingTrait> Binding<B> {
         engine: &mut Engine
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::on_recreate_swapchain(render_state, logic_state, engine);
+        return B::on_recreate_swapchain(logic_state, render_state, engine);
 
         #[cfg(debug_assertions)]
         match self {
