@@ -106,7 +106,7 @@ impl<B: BindingTrait> Binding<B> {
         delta_time: Duration
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::update(logic_state, render_state, engine, image_index, delta_time);
+        return B::update(logic_state, render_state, engine, delta_time);
 
         #[cfg(debug_assertions)]
         match self {
