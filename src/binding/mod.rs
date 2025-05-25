@@ -54,7 +54,7 @@ impl<B: BindingTrait> Binding<B> {
     
     pub fn new_render_state(&self, logic_state: &mut B::LogicState, engine: &mut Engine) -> OctaResult<B::RenderState> {
         #[cfg(not(debug_assertions))]
-        return B::new_render_state(engine);
+        return B::new_render_state(logic_state, engine);
 
         #[cfg(debug_assertions)]
         match self {
@@ -77,7 +77,7 @@ impl<B: BindingTrait> Binding<B> {
 
     pub fn new_logic_state(&self) -> OctaResult<B::LogicState> {
         #[cfg(not(debug_assertions))]
-        return B::new_logic_state(render_state, engine);
+        return B::new_logic_state();
 
         #[cfg(debug_assertions)]
         match self {
@@ -106,7 +106,7 @@ impl<B: BindingTrait> Binding<B> {
         delta_time: Duration
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::update(render_state, logic_state, engine, image_index, delta_time);
+        return B::update(logic_state, render_state, engine, image_index, delta_time);
 
         #[cfg(debug_assertions)]
         match self {
@@ -134,7 +134,7 @@ impl<B: BindingTrait> Binding<B> {
         engine: &mut Engine, 
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::record_render_commands(render_state, logic_state, engine);
+        return B::record_render_commands(logic_state, render_state, engine);
 
         #[cfg(debug_assertions)]
         match self {
@@ -163,7 +163,7 @@ impl<B: BindingTrait> Binding<B> {
         event: &WindowEvent
     ) -> OctaResult<()> {
         #[cfg(not(debug_assertions))]
-        return B::on_window_event(render_state, logic_state, engine, event);
+        return B::on_window_event(logic_state, render_state, engine, event);
 
         #[cfg(debug_assertions)]
         match self {
