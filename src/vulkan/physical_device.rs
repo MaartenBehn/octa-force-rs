@@ -383,21 +383,7 @@ impl PhysicalDeviceCapabilities {
             wanted_extensions_ok &= found;
             (name.to_owned(), found)
         }).collect();
-        
-        // Surface Formats
-        let surface_formats = unsafe {
-            surface
-                .inner
-                .get_physical_device_surface_formats(inner, surface.surface_khr)?
-        };
-
-        let surface_formats_with_storage_bit: Vec<_> = surface_formats.to_owned().into_iter().filter(|format| {
-            unsafe {
-                let property = instance.inner.get_physical_device_format_properties(inner, format.format);
-                property.optimal_tiling_features.contains(FormatFeatureFlags::STORAGE_IMAGE)
-            }
-        }).collect();
-
+ 
         // See https://stackoverflow.com/questions/75094730/why-prefer-non-srgb-format-for-vulkan-swapchain
         let rgba_formats = [
             Format::R8G8B8A8_SRGB,
@@ -408,6 +394,22 @@ impl PhysicalDeviceCapabilities {
             Format::R8G8B8A8_UINT,
         ];
         
+        // Surface Formats
+        let surface_formats = unsafe {
+            surface
+                .inner
+                .get_physical_device_surface_formats(inner, surface.surface_khr)?
+        }.into_iter()
+            .filter(|s| rgba_formats.contains(&s.format))
+            .collect::<Vec<_>>();
+
+        let surface_formats_with_storage_bit: Vec<_> = surface_formats.to_owned().into_iter().filter(|format| {
+            unsafe {
+                let property = instance.inner.get_physical_device_format_properties(inner, format.format);
+                property.optimal_tiling_features.contains(FormatFeatureFlags::STORAGE_IMAGE)
+            }
+        }).collect();
+       
         let render_storage_image_formats: Vec<_> = rgba_formats.into_iter().filter(|format| {
             unsafe {
                 let property = instance.inner.get_physical_device_format_properties(inner, *format);
