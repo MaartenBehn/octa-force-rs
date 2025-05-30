@@ -148,6 +148,19 @@ impl DescriptorSet {
 
                     unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
                 }
+                SampledImage { view, layout } => {
+                    let img_info = vk::DescriptorImageInfo::default()
+                        .image_view(view.inner)
+                        .image_layout(layout);
+
+                    let wds = vk::WriteDescriptorSet::default()
+                        .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                        .dst_binding(write.binding)
+                        .dst_set(self.inner)
+                        .image_info(std::slice::from_ref(&img_info));
+
+                    unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
+                }
                 AccelerationStructure {
                     acceleration_structure,
                 } => {
@@ -257,6 +270,10 @@ pub struct WriteDescriptorSet<'a> {
 #[derive(Clone, Copy)]
 pub enum WriteDescriptorSetKind<'a> {
     StorageImage {
+        view: &'a ImageView,
+        layout: vk::ImageLayout,
+    },
+    SampledImage {
         view: &'a ImageView,
         layout: vk::ImageLayout,
     },

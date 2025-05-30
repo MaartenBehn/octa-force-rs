@@ -18,15 +18,15 @@ impl Engine {
     }
 
     pub fn get_current_command_buffer(&self) -> &CommandBuffer {
-        &self.command_buffers[self.in_flight_frames.current_index]
+        &self.command_buffers[self.in_flight_frames.in_flight_index]
     }
  
     pub fn get_current_swapchain_image_and_view(&self) -> &ImageAndView {
-        &self.swapchain.images_and_views[self.swapchain.current_index]
+        &self.swapchain.images_and_views[self.in_flight_frames.frame_index]
     }
 
     pub fn get_current_depth_image_and_view(&self) -> &ImageAndView {
-        &self.swapchain.depht_images_and_views[self.swapchain.current_index]
+        &self.swapchain.depht_images_and_views[self.in_flight_frames.frame_index]
     }
 
     pub fn get_resolution(&self) -> UVec2 {
@@ -38,6 +38,6 @@ impl Engine {
     }
 
     pub fn get_current_in_flight_frame_index(&self) -> usize {
-        self.in_flight_frames.current_index
+        self.in_flight_frames.in_flight_index
     }
 }

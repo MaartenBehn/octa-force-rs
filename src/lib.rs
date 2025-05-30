@@ -23,6 +23,7 @@ pub mod binding;
 pub mod engine;
 pub mod in_flight_frames;
 
+use anyhow::Context as _;
 use engine::{Engine, EngineConfig};
 use std::{env, process, thread, time::{Duration, Instant}};
 use log::{debug, error, info, trace};
@@ -80,7 +81,7 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) {
 
     if res.is_err() {
         let err = res.unwrap_err();
-        error!("{}", err.to_string());
+        error!("{:#}", err);
         trace!("{}", err.backtrace());
     }
 }
@@ -128,19 +129,21 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
             &mut self.logic_state); 
          
         if active_container.is_err() {
-            let mut err = active_container.unwrap_err();
-            err = err.context("When creating Active Container");
+            let err = active_container.unwrap_err()
+                .context("resumed");
 
-            panic!("{:?}", err);
+            error!("{}", err.to_string());
+            trace!("{}", err.backtrace());
+            event_loop.exit();
         } else {
             self.active = Some(active_container.unwrap()); 
         }
     }
 
-    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
         Self::handle_err(&mut self.active, |x| { 
             x.new_events() 
-        }, "new_events"); 
+        }, "new_events", event_loop); 
     }
 
     fn window_event(
@@ -151,35 +154,35 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
     ) {
         Self::handle_err(&mut self.active, |x| { 
             x.window_event(event_loop, event, &self.binding, &mut self.logic_state) 
-        }, "window_event"); 
+        }, "window_event", event_loop); 
     }
 
     fn device_event(
             &mut self,
-            _event_loop: &ActiveEventLoop,
+            event_loop: &ActiveEventLoop,
             _device_id: winit::event::DeviceId,
             event: winit::event::DeviceEvent,
         ) {
         Self::handle_err(&mut self.active, |x| { 
             x.device_event(event) 
-        }, "device_event"); 
+        }, "device_event", event_loop); 
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         Self::handle_err(&mut self.active, |x| { 
             x.about_to_wait(event_loop, &mut self.logic_state, &mut self.binding, &mut self.dropped_render_state) 
-        }, "about_to_wait");  
+        }, "about_to_wait", event_loop);  
     }
 
-    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+    fn exiting(&mut self, event_loop: &ActiveEventLoop) {
         Self::handle_err(&mut self.active, |x| { 
             x.exiting() 
-        }, "exiting"); 
+        }, "exiting", event_loop); 
     }
 }
 
 impl<B: BindingTrait> GlobalContainer<B> {
-    fn handle_err<F: FnOnce(&mut ActiveContainer<B>) -> OctaResult<()>>(active: &mut Option<ActiveContainer<B>>,  func: F, context: &str) {
+    fn handle_err<F: FnOnce(&mut ActiveContainer<B>) -> OctaResult<()>>(active: &mut Option<ActiveContainer<B>>,  func: F, context: &str, event_loop: &ActiveEventLoop) {
         match active {
             Some(active) => {
                 let res = func(active);
@@ -190,10 +193,11 @@ impl<B: BindingTrait> GlobalContainer<B> {
 
                     error!("{}", err.to_string());
                     trace!("{}", err.backtrace());
+                    event_loop.exit();
                 }
             },
             None => {
-                error!("Cant run {context} -> no active Container!");
+                trace!("Cant run {context} -> no active Container!");
             },
         }
     }
@@ -258,7 +262,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
 
         self.engine.stats_gui.handle_event(&self.engine.window, &event);
         binding.on_window_event(&mut self.render_state, logic_state, &mut self.engine, &event)
-            .expect("Failed in On Window Event");
+            .context("Failed in On Window Event")?;
         
         match event { 
             // On resize
@@ -341,9 +345,9 @@ impl<B: BindingTrait> ActiveContainer<B> {
             if dim.width > 0 && dim.height > 0 {
                 self.engine
                     .recreate_swapchain(dim.width, dim.height)
-                    .expect("Failed to recreate swapchain");
+                    .context("Failed to recreate swapchain")?;
                 binding.on_recreate_swapchain(&mut self.render_state, logic_state, &mut self.engine)
-                    .expect("Error on recreate swapchain callback");
+                    .context("Error on recreate swapchain callback")?;
             } else {
                 return Ok(());
             }
@@ -353,7 +357,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
             binding,
             &mut self.render_state,
             logic_state,
-        ).expect("Failed to tick");
+        ).context("Failed to tick")?;
 
         Ok(())
     }
@@ -361,7 +365,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
     fn exiting(&mut self) -> OctaResult<()> {
         self.engine
             .wait_for_gpu()
-            .expect("Failed to wait for gpu to finish work");
+            .context("Failed to wait for gpu to finish work")?;
                 
         info!("Stopping");
 

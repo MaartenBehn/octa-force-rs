@@ -3,8 +3,9 @@ use log::{debug, info};
 use winit::window::Window;
 
 use crate::in_flight_frames::InFlightFrames;
+use crate::vulkan::Context;
 use crate::{OctaResult, SemaphoreSubmitInfo};
-use crate::{controls::Controls, gui::Gui, hot_reloading::HotReloadConfig, stats::FrameStats, CommandBuffer, CommandPool, Context, Swapchain};
+use crate::{controls::Controls, gui::Gui, hot_reloading::HotReloadConfig, stats::FrameStats, CommandBuffer, CommandPool, Swapchain};
 
 use crate::stats::StatsDisplayMode;
 use ash::vk::{self};
@@ -112,7 +113,10 @@ impl Engine {
 
         let command_buffers = create_command_buffers(&command_pool, &swapchain)?;
 
-        let in_flight_frames = InFlightFrames::new(&context, engine_config.num_frames_in_flight)?;
+        let in_flight_frames = InFlightFrames::new(
+            &context, 
+            swapchain.images_and_views.len(),  
+            engine_config.num_frames_in_flight)?;
 
         let controls = Controls::default();
         
@@ -159,6 +163,7 @@ impl Engine {
         // Drawing the frame
         self.in_flight_frames.next();
         self.in_flight_frames.fence().wait(None)?;
+        self.in_flight_frames.fence().reset()?;
 
         // Can't get for gpu time on the first frames or vkGetQueryPoolResults gets stuck
         // due to VK_QUERY_RESULT_WAIT_BIT
@@ -171,15 +176,11 @@ impl Engine {
 
         if self.swapchain.acquire_next_image(
             std::u64::MAX,
-            self.in_flight_frames.image_available_semaphore(),
+            &mut self.in_flight_frames,
         )? {
             return Ok(true);
         }
-        
-        self.in_flight_frames.fence().reset()?;
-        
-        // debug!("Frame Index: {frame_index}", );
-        
+         
         {
             #[cfg(debug_assertions)]
             puffin::profile_scope!("update app");
@@ -189,7 +190,7 @@ impl Engine {
         self.record_command_buffer(binding, render_state, logic_state)?;
 
         self.context.graphics_queue.submit(
-            &self.command_buffers[self.in_flight_frames.current_index],
+            &self.command_buffers[self.in_flight_frames.in_flight_index],
             Some(SemaphoreSubmitInfo {
                 semaphore: self.in_flight_frames.image_available_semaphore(),
                 stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
@@ -201,10 +202,8 @@ impl Engine {
             self.in_flight_frames.fence(),
         )?;
 
-        let signal_semaphores = [self.in_flight_frames.render_finished_semaphore()];
         let present_result = self.swapchain.queue_present(
-            self.swapchain.current_index as _,
-            &signal_semaphores,
+            &self.in_flight_frames,
             &self.context.present_queue,
         );
         match present_result {
@@ -223,7 +222,7 @@ impl Engine {
         #[cfg(debug_assertions)]
         puffin::profile_function!();
 
-        let buffer = &self.command_buffers[self.in_flight_frames.current_index];
+        let buffer = &self.command_buffers[self.in_flight_frames.in_flight_index];
         buffer.reset()?;
         buffer.begin(None)?;
         buffer.reset_all_timestamp_queries_from_pool(self.in_flight_frames.timing_query_pool());
@@ -240,15 +239,15 @@ impl Engine {
             binding.record_render_commands(render_state, logic_state, self)?;
         }
 
-        let buffer = &self.command_buffers[self.in_flight_frames.current_index];
+        let buffer = &self.command_buffers[self.in_flight_frames.in_flight_index];
 
         if self.frame_stats.stats_display_mode != StatsDisplayMode::None {
             #[cfg(debug_assertions)]
             puffin::profile_scope!("render stats");
 
             buffer.begin_rendering(
-                &self.swapchain.images_and_views[self.swapchain.current_index].view,
-                &self.swapchain.depht_images_and_views[self.swapchain.current_index].view,
+                &self.get_current_swapchain_image_and_view().view,
+                &self.get_current_depth_image_and_view().view,
                 self.swapchain.size,
                 vk::AttachmentLoadOp::DONT_CARE,
                 None,
@@ -257,7 +256,7 @@ impl Engine {
             self.stats_gui.cmd_draw(
                 buffer, 
                 self.swapchain.size,
-                self.in_flight_frames.current_index,
+                self.in_flight_frames.in_flight_index,
                 &self.window, 
                 &self.context,
                 |ctx| {
@@ -268,7 +267,7 @@ impl Engine {
             buffer.end_rendering();
         }
 
-        buffer.swapchain_image_present_barrier(&self.swapchain.images_and_views[self.swapchain.current_index].image)?;
+        buffer.swapchain_image_present_barrier(&self.swapchain.images_and_views[self.in_flight_frames.frame_index].image)?;
         buffer.write_timestamp(
             vk::PipelineStageFlags2::ALL_COMMANDS,
             self.in_flight_frames.timing_query_pool(),

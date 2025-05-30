@@ -7,7 +7,8 @@ use ash::vk::{ImageUsageFlags};
 use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
 
-use crate::OctaResult;
+use crate::in_flight_frames::InFlightFrames;
+use crate::{in_flight_frames, OctaResult};
 use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore};
 use crate::vulkan::Image;
 
@@ -24,7 +25,6 @@ pub struct Swapchain {
     pub present_mode: vk::PresentModeKHR,
     pub images_and_views: Vec<ImageAndView>,
     pub depht_images_and_views: Vec<ImageAndView>,
-    pub current_index: usize,
 }
 
 impl Swapchain {
@@ -144,7 +144,6 @@ impl Swapchain {
             present_mode,
             images_and_views,
             depht_images_and_views,
-            current_index: 0,
         })
     }
 
@@ -254,36 +253,36 @@ impl Swapchain {
         Ok(())
     }
 
-    pub fn acquire_next_image(&mut self, timeout: u64, semaphore: &Semaphore) -> OctaResult<bool> {
+    pub fn acquire_next_image(&mut self, timeout: u64, in_flight_frames: &mut InFlightFrames) -> OctaResult<bool> {
         let res = unsafe {
             self.inner.acquire_next_image(
                 self.swapchain_khr,
                 timeout,
-                semaphore.inner,
+                in_flight_frames.image_available_semaphore().inner,
                 vk::Fence::null(),
             )
         };
 
-        self.current_index = match res {
+        let index = match res {
             Ok((index, .. )) => index as usize,
             Err(err) => match err {
                 vk::Result::ERROR_OUT_OF_DATE_KHR => return Ok(true),
                 _ => panic!("Error while acquiring next image. Cause: {}", err),
             },
         };
+        in_flight_frames.set_frame_index(index);
 
         Ok(false)
     }
 
     pub fn queue_present(
         &self,
-        image_index: u32,
-        wait_semaphores: &[&Semaphore],
+        in_flight_frames: &InFlightFrames,
         queue: &Queue,
     ) -> Result<bool> {
         let swapchains = [self.swapchain_khr];
-        let images_indices = [image_index];
-        let wait_semaphores = wait_semaphores.iter().map(|s| s.inner).collect::<Vec<_>>();
+        let images_indices = [in_flight_frames.frame_index as _];
+        let wait_semaphores = [in_flight_frames.render_finished_semaphore()].iter().map(|s| s.inner).collect::<Vec<_>>();
 
         let present_info = vk::PresentInfoKHR::default()
             .wait_semaphores(&wait_semaphores)
