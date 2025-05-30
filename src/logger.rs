@@ -6,10 +6,10 @@ use crate::OctaResult;
 
 pub fn log_init() -> OctaResult<()> {
     {
-        let _ = fs::remove_file("debug.log"); 
+        let _ = fs::remove_file("trace.log"); 
         CombinedLogger::init(vec![
             TermLogger::new(
-                LevelFilter::Debug,
+                LevelFilter::Trace,
                 Config::default(),
                 TerminalMode::Mixed,
                 ColorChoice::Auto,
