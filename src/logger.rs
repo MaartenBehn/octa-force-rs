@@ -9,15 +9,15 @@ pub fn log_init() -> OctaResult<()> {
         let _ = fs::remove_file("trace.log"); 
         CombinedLogger::init(vec![
             TermLogger::new(
-                LevelFilter::Trace,
+                LevelFilter::Debug,
                 Config::default(),
                 TerminalMode::Mixed,
                 ColorChoice::Auto,
             ),
             WriteLogger::new(
-                LevelFilter::Debug, 
+                LevelFilter::Trace, 
                 Config::default(), 
-                File::create("debug.log")?
+                File::create("trace.log")?
             ),
         ])?;
     }
