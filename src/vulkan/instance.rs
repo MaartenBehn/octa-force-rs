@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use ash::{
     ext::debug_utils::Instance as DebugUtils,
     vk::{self, DebugUtilsMessengerEXT},
-    Entry, Instance as AshInstance,
+    Instance as AshInstance,
 };
 use log::{debug, info};
 use raw_window_handle::HasDisplayHandle;
@@ -16,6 +16,11 @@ use raw_window_handle::HasRawDisplayHandle;
 use anyhow::bail;
 
 use crate::{engine::EngineFeatureValue, vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
+
+use super::entry::Entry;
+
+const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
+
 
 #[allow(dead_code)]
 pub struct Instance {
@@ -63,10 +68,12 @@ impl Instance {
         let (_layer_names, layer_names_ptrs) = get_validation_layer_names_and_pointers();
         #[cfg(debug_assertions)]
         if engine_config.validation_layers != EngineFeatureValue::NotUsed {
-            if check_validation_layer_support(&entry) {
+            
+            if entry.check_layer_support(&REQUIRED_DEBUG_LAYERS)? {
                 extension_names.push(ash::ext::debug_utils::NAME.as_ptr());
                 instance_create_info = instance_create_info.enabled_layer_names(&layer_names_ptrs);
                 validation_layers = true;
+
             } else if engine_config.validation_layers == EngineFeatureValue::Needed {
                 bail!("Validation Layers are needed but not supported by hardware.")
             }
@@ -108,7 +115,7 @@ impl Instance {
 
         // Creating Instance
         let inner = unsafe { 
-            entry.create_instance(&instance_create_info, None)
+            entry.inner.create_instance(&instance_create_info, None)
                 .context("Creating Instance")?
         };
 
@@ -130,7 +137,6 @@ impl Instance {
 }
 
 
-const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
 /// Get the pointers to the validation layers names.
 /// Also return the corresponding `CString` to avoid dangling pointers.
@@ -145,32 +151,6 @@ pub fn get_validation_layer_names_and_pointers() -> (Vec<CString>, Vec<*const c_
         .map(|name| name.as_ptr())
         .collect::<Vec<_>>();
     (layer_names, layer_names_ptrs)
-}
-
-/// Check if the required validation set in `REQUIRED_LAYERS`
-/// are supported by the Vulkan instance.
-#[allow(dead_code)]
-pub fn check_validation_layer_support(entry: &Entry) -> bool {
-
-    let mut found = false;
-    for required in REQUIRED_DEBUG_LAYERS.iter() {
-        found |= unsafe{
-            entry.enumerate_instance_layer_properties()
-                .unwrap()
-                .iter()
-                .any(|layer| {
-                    let name = CStr::from_ptr(layer.layer_name.as_ptr());
-                    let name = name.to_str().expect("Failed to get layer name pointer");
-                    required == &name
-                })
-        }
-    }
-
-    if !found {
-        log::warn!("Validation layer not supported: {:?}", REQUIRED_DEBUG_LAYERS);
-    }
-
-    found
 }
 
 #[allow(dead_code)]
@@ -212,7 +192,7 @@ pub fn setup_debug_messenger(
         )
         .pfn_user_callback(Some(vulkan_debug_callback));
 
-    let debug_utils = DebugUtils::new(_entry, _instance);
+    let debug_utils = DebugUtils::new(&_entry.inner, _instance);
     let debug_utils_messenger = unsafe {
         debug_utils
             .create_debug_utils_messenger(&create_info, None)

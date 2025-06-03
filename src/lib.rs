@@ -23,13 +23,14 @@ pub mod binding;
 pub mod engine;
 pub mod in_flight_frames;
 
-use anyhow::Context as _;
+use anyhow::{bail, Context as _};
+use ash::khr::surface;
 use engine::{Engine, EngineConfig};
 use std::{env, process, thread, time::{Duration, Instant}};
-use log::{debug, error, info, trace};
-use vulkan::*;
+use log::{debug, error, info, trace, warn};
+use vulkan::{entry::Entry, *};
 use winit::{
-    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, platform::wayland::EventLoopExtWayland};
+    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, platform::{wayland::EventLoopExtWayland, x11::EventLoopBuilderExtX11}};
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -44,6 +45,7 @@ use crate::logger::{log_init};
 pub type OctaResult<V> = anyhow::Result<V>;
 
 struct GlobalContainer<B: BindingTrait> {
+    pub entry: Entry,
     pub engine_config: EngineConfig,
     pub binding: Binding<B>,
     pub logic_state: B::LogicState,
@@ -88,12 +90,16 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) {
 
 fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> { 
     let mut global_container = GlobalContainer::<B>::new(engine_config)?;
-        
+      
     let mut event_loop = EventLoop::new()?;
     
     // Fallback to X11 when wayland is not supported by vulkan 
-    if event_loop.is_wayland() && Instance::  {
+    if event_loop.is_wayland() && !global_container.entry.supports_wayland()? {
+        warn!("Wayland is not supported by Vulkan. Falling back to X11.");
 
+        event_loop = EventLoop::builder()
+            .with_x11()
+            .build()?;
     }
 
     event_loop.set_control_flow(ControlFlow::Poll);
@@ -113,10 +119,17 @@ fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
 
 impl<B: BindingTrait> GlobalContainer<B> {
     fn new(engine_config: EngineConfig) -> OctaResult<Self> {
+        let entry = Entry::new();
+
+        if !entry.supports_surface()? {
+            bail!("Vulkan does not support Surface Extension")
+        }
+
         let binding = get_binding::<B>(&engine_config)?;
         let logic_state = binding.new_logic_state()?;
 
         Ok(Self {
+            entry,
             engine_config,
             binding,
             logic_state,
@@ -129,6 +142,7 @@ impl<B: BindingTrait> GlobalContainer<B> {
 impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let active_container = ActiveContainer::new(
+            self.entry.to_owned(),
             event_loop, 
             &self.engine_config, 
             &self.binding,
@@ -211,13 +225,14 @@ impl<B: BindingTrait> GlobalContainer<B> {
 
 impl<B: BindingTrait> ActiveContainer<B> {
     fn new(
+        entry: Entry,
         event_loop: &ActiveEventLoop,
         engine_config: &EngineConfig,
         binding: &Binding<B>,
         logic_state: &mut B::LogicState,
     ) -> OctaResult<Self> {
 
-        let mut engine = Engine::new(&event_loop, &engine_config)?;
+        let mut engine = Engine::new(entry, &event_loop, &engine_config)?;
         let render_state = binding.new_render_state(logic_state, &mut engine)?;
         
         let is_swapchain_dirty = false;

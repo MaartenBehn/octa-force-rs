@@ -4,6 +4,7 @@ use log::{debug, info};
 use winit::window::Window;
 
 use crate::in_flight_frames::InFlightFrames;
+use crate::vulkan::entry::Entry;
 use crate::vulkan::Context;
 use crate::{OctaResult, SemaphoreSubmitInfo};
 use crate::{controls::Controls, gui::Gui, hot_reloading::HotReloadConfig, stats::FrameStats, CommandBuffer, CommandPool, Swapchain};
@@ -88,6 +89,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(
+        entry: Entry,
         event_loop: &ActiveEventLoop,
         engine_config: &EngineConfig
     ) -> OctaResult<Self> {
@@ -99,7 +101,7 @@ impl Engine {
             .with_resizable(true))?;
 
         // Vulkan context
-        let context = Context::new(&window, &window, engine_config)
+        let context = Context::new(entry, &window, &window, engine_config)
             .context("New Context")?;
 
         let command_pool = context.create_command_pool(

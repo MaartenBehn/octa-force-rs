@@ -1,6 +1,6 @@
 use std::{fmt, sync::{Arc, Mutex}};
 use anyhow::{Context as _, Result};
-use ash::{vk, Entry};
+use ash::{vk};
 use gpu_allocator::{
     vulkan::{Allocator, AllocatorCreateDesc},
     AllocatorDebugSettings,
@@ -11,6 +11,8 @@ use crate::{engine::EngineFeatureValue, vulkan::{device::Device, instance::Insta
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::extensions::khr::{DynamicRendering, Synchronization2};
 use crate::vulkan::physical_device::PhysicalDevice;
+
+use super::entry::Entry;
 
 pub const DEBUG_GPU_ALLOCATOR: bool = false;
 
@@ -26,7 +28,7 @@ pub struct Context {
     pub instance: Instance,
     pub debug_printing: bool,
     pub shader_clock: bool,
-    _entry: Entry,
+    pub entry: Entry,
 
     #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
     pub(crate) synchronization2: Synchronization2,
@@ -36,18 +38,18 @@ pub struct Context {
 }
 impl Context {
     pub fn new<'a>(
+        entry: Entry,
         window_handle: &'a dyn HasWindowHandle,
         display_handle: &'a dyn HasDisplayHandle,
         engine_config: &EngineConfig
     ) -> Result<Self> {
 
         // Vulkan instance
-        let entry = Entry::linked();
         let mut instance = Instance::new(&entry, display_handle, engine_config)
             .context("New Instance")?;
 
         // Vulkan surface
-        let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;
+        let surface = Surface::new(&entry.inner, &instance, window_handle, display_handle)?;
         
         // Physical Device
         let mut required_extensions = engine_config.required_extensions.clone();
@@ -277,7 +279,7 @@ impl Context {
             instance,
             debug_printing,
             shader_clock,
-            _entry: entry,
+            entry,
 
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
             synchronization2,
@@ -339,7 +341,7 @@ impl fmt::Debug for Context {
             .field("instance", &self.instance)
             .field("debug_printing", &self.debug_printing)
             .field("shader_clock", &self.shader_clock)
-            .field("_entry", &())
+            .field("entry", &())
             //.field("synchronization2", &self.synchronization2)
             //.field("dynamic_rendering", &self.dynamic_rendering)
             .finish()
