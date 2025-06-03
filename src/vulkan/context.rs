@@ -1,5 +1,5 @@
 use std::{fmt, sync::{Arc, Mutex}};
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use ash::{vk, Entry};
 use gpu_allocator::{
     vulkan::{Allocator, AllocatorCreateDesc},
@@ -43,7 +43,8 @@ impl Context {
 
         // Vulkan instance
         let entry = Entry::linked();
-        let mut instance = Instance::new(&entry, display_handle, engine_config)?;
+        let mut instance = Instance::new(&entry, display_handle, engine_config)
+            .context("New Instance")?;
 
         // Vulkan surface
         let surface = Surface::new(&entry, &instance, window_handle, display_handle)?;

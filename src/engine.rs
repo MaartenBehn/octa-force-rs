@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use glam::UVec2;
 use log::{debug, info};
 use winit::window::Window;
@@ -98,7 +99,8 @@ impl Engine {
             .with_resizable(true))?;
 
         // Vulkan context
-        let context = Context::new(&window, &window, engine_config)?;
+        let context = Context::new(&window, &window, engine_config)
+            .context("New Context")?;
 
         let command_pool = context.create_command_pool(
             context.physical_device.graphics_queue_family,

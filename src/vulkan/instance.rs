@@ -6,7 +6,7 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Entry, Instance as AshInstance,
 };
-use log::info;
+use log::{debug, info};
 use raw_window_handle::HasDisplayHandle;
 
 #[allow(deprecated)]
@@ -99,6 +99,12 @@ impl Instance {
         }
 
         instance_create_info = instance_create_info.enabled_extension_names(&extension_names);
+
+        let extensions = extension_names.iter()
+            .map(|ptr| unsafe{ CStr::from_ptr(*ptr)})
+            .collect::<Vec<_>>();
+        
+        debug!("Extensions: {extensions:?}");
 
         // Creating Instance
         let inner = unsafe { 

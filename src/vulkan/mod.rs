@@ -21,6 +21,7 @@ pub mod sampler_pool;
 mod surface;
 mod swapchain;
 mod sync;
+mod extensions;
 
 pub mod push_constant;
 pub mod utils;

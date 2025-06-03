@@ -29,7 +29,7 @@ use std::{env, process, thread, time::{Duration, Instant}};
 use log::{debug, error, info, trace};
 use vulkan::*;
 use winit::{
-    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}};
+    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, platform::wayland::EventLoopExtWayland};
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -89,7 +89,13 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) {
 fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> { 
     let mut global_container = GlobalContainer::<B>::new(engine_config)?;
         
-    let event_loop = EventLoop::new()?;
+    let mut event_loop = EventLoop::new()?;
+    
+    // Fallback to X11 when wayland is not supported by vulkan 
+    if event_loop.is_wayland() && Instance::  {
+
+    }
+
     event_loop.set_control_flow(ControlFlow::Poll);
 
     event_loop.run_app(&mut global_container)?;
@@ -132,7 +138,7 @@ impl<B: BindingTrait> ApplicationHandler for GlobalContainer<B> {
             let err = active_container.unwrap_err()
                 .context("resumed");
 
-            error!("{}", err.to_string());
+            error!("{:#}", err);
             trace!("{}", err.backtrace());
             event_loop.exit();
         } else {
@@ -191,7 +197,7 @@ impl<B: BindingTrait> GlobalContainer<B> {
                     let err = res.unwrap_err()
                         .context(context.to_string());
 
-                    error!("{}", err.to_string());
+                    error!("{:#}", err);
                     trace!("{}", err.backtrace());
                     event_loop.exit();
                 }
