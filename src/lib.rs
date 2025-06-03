@@ -91,16 +91,16 @@ pub fn run<B: BindingTrait>(engine_config: EngineConfig) {
 fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> { 
     let mut global_container = GlobalContainer::<B>::new(engine_config)?;
       
-    let mut event_loop = EventLoop::new()?;
+    let mut event_loop_builder = EventLoop::builder();
     
     // Fallback to X11 when wayland is not supported by vulkan 
-    if event_loop.is_wayland() && !global_container.entry.supports_wayland()? {
+    if cfg!(target_os = "linux") && !global_container.entry.supports_wayland()? {
         warn!("Wayland is not supported by Vulkan. Falling back to X11.");
-
-        event_loop = EventLoop::builder()
-            .with_x11()
-            .build()?;
+        
+        event_loop_builder.with_x11();
     }
+
+    let event_loop = event_loop_builder.build()?;
 
     event_loop.set_control_flow(ControlFlow::Poll);
 

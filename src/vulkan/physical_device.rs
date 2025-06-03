@@ -400,7 +400,7 @@ impl PhysicalDeviceCapabilities {
                 .inner
                 .get_physical_device_surface_formats(inner, surface.surface_khr)?
         }.into_iter()
-            .filter(|s| rgba_formats.contains(&s.format))
+            //.filter(|s| rgba_formats.contains(&s.format))
             .collect::<Vec<_>>();
 
         let surface_formats_with_storage_bit: Vec<_> = surface_formats.to_owned().into_iter().filter(|format| {
