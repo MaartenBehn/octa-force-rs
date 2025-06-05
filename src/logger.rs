@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 
 use log::{LevelFilter, Log};
-use simplelog::{ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger, TerminalMode, WriteLogger};
+use simplelog::{ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger};
 use crate::OctaResult;
 
 pub fn log_init() -> OctaResult<()> {

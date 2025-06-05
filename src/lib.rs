@@ -24,13 +24,12 @@ pub mod engine;
 pub mod in_flight_frames;
 
 use anyhow::{bail, Context as _};
-use ash::khr::surface;
 use engine::{Engine, EngineConfig};
 use std::{env, process, thread, time::{Duration, Instant}};
 use log::{debug, error, info, trace, warn};
 use vulkan::{entry::Entry, *};
 use winit::{
-    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, platform::{wayland::EventLoopExtWayland, x11::EventLoopBuilderExtX11}};
+    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, platform::{x11::EventLoopBuilderExtX11}};
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
 

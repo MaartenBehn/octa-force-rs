@@ -8,7 +8,7 @@ use gpu_allocator::{
     vulkan::{Allocation, AllocationCreateDesc, Allocator},
     MemoryLocation,
 };
-use log::{debug, trace};
+use log::trace;
 
 use crate::{vulkan::device::Device, Context};
 use crate::vulkan::align::Align;

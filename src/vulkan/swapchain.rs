@@ -8,8 +8,8 @@ use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
 
 use crate::in_flight_frames::InFlightFrames;
-use crate::{in_flight_frames, OctaResult};
-use crate::{vulkan::device::Device, vulkan::Queue, Context, Semaphore};
+use crate::OctaResult;
+use crate::{vulkan::device::Device, vulkan::Queue, Context};
 use crate::vulkan::Image;
 
 use super::ImageAndView;

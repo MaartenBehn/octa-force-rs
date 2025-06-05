@@ -24,7 +24,7 @@ impl HotReloadController {
             hot_reload_config.lib_name, None, None)?;
         
         unsafe {
-            let call: Symbol<unsafe extern fn(&'static dyn Log) -> OctaResult<()>> =
+            let call: Symbol<unsafe extern "C" fn(&'static dyn Log) -> OctaResult<()>> =
                 lib_reloader.get_symbol("init_hot_reload")?;
             call(log::logger())?;
         }
