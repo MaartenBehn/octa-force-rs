@@ -40,4 +40,9 @@ impl Engine {
     pub fn get_current_in_flight_frame_index(&self) -> usize {
         self.in_flight_frames.in_flight_index
     }
+
+    pub fn get_current_frame_index(&self) -> usize {
+        self.in_flight_frames.frame_index
+    }
+
 }

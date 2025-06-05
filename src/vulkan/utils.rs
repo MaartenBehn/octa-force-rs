@@ -247,6 +247,10 @@ impl Context {
 
         Ok(())
     }
+
+    pub fn swapchain_supports_storage(&self) -> bool {
+        self.physical_device.render_storage_image_format == self.physical_device.surface_format.format
+    }
 }
 
 impl CommandBuffer {
@@ -334,6 +338,20 @@ impl CommandBuffer {
                 dst_stage_mask: vk::PipelineStageFlags2::ALL_COMMANDS,
             },
         ]);
+
+        Ok(())
+    }
+
+    pub fn swapchain_image_after_blit_barrier(&self, swapchain_image: &Image) -> Result<()> {
+        self.pipeline_image_barriers(&[ImageBarrier {
+            image: swapchain_image,
+            old_layout: vk::ImageLayout::UNDEFINED,
+            new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            src_access_mask: vk::AccessFlags2::NONE,
+            dst_access_mask: vk::AccessFlags2::COLOR_ATTACHMENT_READ,
+            src_stage_mask: vk::PipelineStageFlags2::NONE,
+            dst_stage_mask: vk::PipelineStageFlags2::COLOR_ATTACHMENT_OUTPUT,
+        }]);
 
         Ok(())
     }

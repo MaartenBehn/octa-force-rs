@@ -6,6 +6,7 @@ use ash::vk;
 use ash::vk::{ImageUsageFlags};
 use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
+use log::{debug, trace};
 
 use crate::in_flight_frames::InFlightFrames;
 use crate::OctaResult;
@@ -78,11 +79,18 @@ impl Swapchain {
                 .image_format(format.format)
                 .image_color_space(format.color_space)
                 .image_extent(extent)
-                .image_array_layers(1)
-                .image_usage(
-                    vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
-                );
+                .image_array_layers(1);
 
+                builder = if context.swapchain_supports_storage() {
+                    builder.image_usage(
+                        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::STORAGE,
+                    )
+                } else {
+                    builder.image_usage(
+                        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
+                    )
+                };
+                
             builder = if context.physical_device.graphics_queue_family.index != context.physical_device.present_queue_family.index {
                 builder
                     .image_sharing_mode(vk::SharingMode::CONCURRENT)
@@ -191,10 +199,17 @@ impl Swapchain {
                 .image_format(self.format)
                 .image_color_space(self.color_space)
                 .image_extent(extent)
-                .image_array_layers(1)
-                .image_usage(
+                .image_array_layers(1);
+
+            builder = if context.swapchain_supports_storage() {
+                builder.image_usage(
+                    vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::STORAGE,
+                )
+            } else {
+                builder.image_usage(
                     vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_DST,
-                );
+                )
+            };
 
             builder = if context.physical_device.graphics_queue_family.index != context.physical_device.present_queue_family.index {
                 builder
