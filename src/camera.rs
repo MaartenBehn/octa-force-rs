@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use glam::{vec3, Mat3, Mat4, Quat, Vec3, Vec2};
+use glam::{vec3, Mat3, Mat4, Quat, Vec2, Vec3};
 
 use crate::controls::Controls;
 
@@ -8,7 +8,7 @@ const ANGLE_PER_POINT: f32 = 0.001745;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Camera {
-    pub position: Vec3,
+    position: Vec3,
     pub direction: Vec3,
     pub fov: f32,
     pub aspect_ratio: f32,
@@ -16,6 +16,8 @@ pub struct Camera {
     pub z_far: f32,
     pub speed: f32,
     pub up: Vec3,
+    meter_per_unit: f32,
+    unit_per_meter: f32,
 }
 
 impl Camera {
@@ -27,9 +29,10 @@ impl Camera {
         z_near: f32,
         z_far: f32,
         up: Vec3,
+        meter_per_unit: f32,
     ) -> Self {
         Self {
-            position,
+            position: position,
             direction: direction.normalize(),
             fov,
             aspect_ratio,
@@ -37,9 +40,16 @@ impl Camera {
             z_far,
             speed: 3.0,
             up,
+            unit_per_meter: 1.0 / meter_per_unit,
+            meter_per_unit,
         }
-    } 
-    
+    }
+
+    pub fn set_meter_per_unit(&mut self, meter_per_unit: f32) {
+        self.meter_per_unit = meter_per_unit;
+        self.unit_per_meter = 1.0 / meter_per_unit;
+    }
+
     pub fn set_screen_size(&mut self, size: Vec2) {
         self.aspect_ratio = size.x / size.y
     }
@@ -88,7 +98,7 @@ impl Camera {
             direction.normalize()
         };
 
-        self.position += direction * self.speed * delta_time;
+        self.position += direction * self.speed * delta_time * self.unit_per_meter;
         self.direction = new_direction;
     }
 
@@ -103,6 +113,30 @@ impl Camera {
             self.z_near,
             self.z_far,
         )
+    }
+
+    pub fn set_position_in_meters(&mut self, pos: Vec3) {
+        self.position = pos * self.unit_per_meter;
+    }
+
+    pub fn set_position_in_shader_unit(&mut self, pos: Vec3) {
+        self.position = pos;
+    }
+
+    pub fn move_in_meter(&mut self, offset: Vec3) {
+        self.position += offset * self.unit_per_meter;
+    }
+
+    pub fn move_in_shader_unit(&mut self, offset: Vec3) {
+        self.position += offset;
+    }
+
+    pub fn get_position_in_meters(&self) -> Vec3 {
+        self.position * self.meter_per_unit
+    }
+
+    pub fn get_position_in_shader_units(&self) -> Vec3 {
+        self.position
     }
 }
 
@@ -149,6 +183,7 @@ impl Default for Camera {
             0.1,
             10.0,
             vec3(0.0, 1.0, 0.0),
+            1.0,
         )
     }
 }

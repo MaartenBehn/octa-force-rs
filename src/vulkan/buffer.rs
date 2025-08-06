@@ -1,7 +1,8 @@
 use std::{
-    mem::align_of,
-    sync::{Arc, Mutex},
+    mem::align_of, sync::{Arc, Mutex}
 };
+use std::slice::from_raw_parts_mut;
+
 
 use crate::vulkan::align::Align;
 use crate::vulkan::{Context, Device};
@@ -56,7 +57,7 @@ impl Buffer {
         })
     }
 
-    pub fn copy_data_to_buffer<T: Copy>(&self, data: &[T]) -> Result<()> {
+    pub fn copy_data_to_buffer<T: Copy>(&self, data: &[T]) {
         self.copy_data_to_buffer_complex(data, 0, align_of::<T>())
     }
 
@@ -65,7 +66,7 @@ impl Buffer {
         data: &[T],
         offset: usize,
         alignment: usize,
-    ) -> Result<()> {
+    ) {
         unsafe {
             let data_ptr = self
                 .allocation
@@ -78,20 +79,66 @@ impl Buffer {
             let mut align: Align<T> = Align::new(data_ptr, alignment as _, data.len(), offset);
             align.copy_from_slice(data);
         };
-
-        Ok(())
     }
 
-    pub fn get_data_from_buffer<T: Copy>(&self, count: usize) -> Result<Vec<T>> {
+    pub fn copy_data_to_buffer_without_aligment<T: Copy>(
+        &self,
+        data: &[T],
+        offset: usize,
+    ) {
+        unsafe {
+            let data_ptr = self
+                .allocation
+                .as_ref()
+                .unwrap()
+                .mapped_ptr()
+                .unwrap()
+                .as_ptr()
+                .cast::<u8>()
+                .offset(offset as isize);
+
+            let mapped_slice = from_raw_parts_mut(data_ptr.cast(), data.len());
+            mapped_slice.copy_from_slice(data);
+        };
+    }
+
+    pub fn get_mapped_slice<T>(&self) -> &mut [T] {
+        let mapped_slice;
+        unsafe {
+            let data_ptr = self
+                .allocation
+                .as_ref()
+                .unwrap()
+                .mapped_ptr()
+                .unwrap()
+                .as_ptr()
+                .cast::<T>();
+
+            mapped_slice = from_raw_parts_mut(data_ptr, self.size as usize / size_of::<T>());
+        }
+        mapped_slice
+    }
+
+    pub fn ptr(&self) -> *const u8 {
+        self
+            .allocation
+            .as_ref()
+            .unwrap()
+            .mapped_ptr()
+            .unwrap()
+            .as_ptr() as *const u8 
+    }
+
+    pub fn get_data_from_buffer<T: Copy>(&self, count: usize) -> Vec<T> {
         self.get_data_from_buffer_complex(count, 0, align_of::<T>())
     }
-
+ 
     pub fn get_data_from_buffer_complex<T: Copy>(
         &self,
         count: usize,
         offset: usize,
         alignment: usize,
-    ) -> Result<Vec<T>> {
+    ) -> Vec<T> {
         let data;
         unsafe {
             let data_ptr = self
@@ -106,7 +153,7 @@ impl Buffer {
             data = align.copy_to_slice(count)
         };
 
-        Ok(data)
+        data
     }
 
     pub fn get_device_address(&self) -> u64 {

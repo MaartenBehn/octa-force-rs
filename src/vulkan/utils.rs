@@ -41,7 +41,7 @@ impl Context {
             MemoryLocation::CpuToGpu,
             size,
         )?;
-        staging_buffer.copy_data_to_buffer_complex(data, 0, alignment)?;
+        staging_buffer.copy_data_to_buffer_complex(data, 0, alignment);
 
         let buffer = self.create_buffer(
             usage | vk::BufferUsageFlags::TRANSFER_DST,
@@ -67,7 +67,7 @@ impl Context {
             MemoryLocation::CpuToGpu,
             buffer.size,
         )?;
-        staging_buffer.copy_data_to_buffer(data)?;
+        staging_buffer.copy_data_to_buffer(data);
 
         self.execute_one_time_commands(|cmd_buffer| {
             cmd_buffer.copy_buffer(&staging_buffer, &buffer);
@@ -138,7 +138,7 @@ impl Context {
             MemoryLocation::CpuToGpu,
             size,
         )?;
-        staging_buffer.copy_data_to_buffer_complex(data, 0, align_of::<T>())?;
+        staging_buffer.copy_data_to_buffer_complex(data, 0, align_of::<T>());
 
         let image = self.create_image(
             ImageUsageFlags::TRANSFER_DST | ImageUsageFlags::SAMPLED,

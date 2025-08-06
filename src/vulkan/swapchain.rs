@@ -6,7 +6,6 @@ use ash::vk;
 use ash::vk::{ImageUsageFlags};
 use glam::{UVec2, uvec2};
 use gpu_allocator::MemoryLocation;
-use log::{debug, trace};
 
 use crate::in_flight_frames::InFlightFrames;
 use crate::OctaResult;

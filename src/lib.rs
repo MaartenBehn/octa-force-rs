@@ -10,6 +10,7 @@ pub extern crate egui_winit;
 pub extern crate puffin_egui;
 pub extern crate egui_extras;
 pub extern crate image;
+pub extern crate itertools;
 
 pub mod camera;
 pub mod controls;
@@ -25,7 +26,7 @@ pub mod in_flight_frames;
 
 use anyhow::{bail, Context as _};
 use engine::{Engine, EngineConfig};
-use std::{env, process, thread, time::{Duration, Instant}};
+use std::{env, thread, time::{Duration, Instant}};
 use log::{debug, error, info, trace, warn};
 use vulkan::{entry::Entry, *};
 use winit::{
@@ -339,7 +340,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
         _event_loop: &ActiveEventLoop, 
         logic_state: &mut B::LogicState, 
         binding: &mut Binding<B>, 
-        dropped_render_state: &mut Vec<B::RenderState>,
+        _dropped_render_state: &mut Vec<B::RenderState>,
     ) -> OctaResult<()> {
 
         #[cfg(debug_assertions)]
@@ -354,7 +355,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
                 mem::swap(&mut render_state, &mut self.render_state);
 
                 // Droppeing memory created in lib will frezze the game so we just keep it.
-                dropped_render_state.push(render_state);
+                _dropped_render_state.push(render_state);
 
                 info!("Hot Reload done");
             }

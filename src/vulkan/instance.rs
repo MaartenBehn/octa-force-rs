@@ -15,7 +15,7 @@ use raw_window_handle::HasRawDisplayHandle;
 #[cfg(debug_assertions)]
 use anyhow::bail;
 
-use crate::{engine::EngineFeatureValue, vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
+use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
 
 use super::entry::Entry;
 
