@@ -26,9 +26,10 @@ pub mod in_flight_frames;
 
 use anyhow::{bail, Context as _};
 use engine::{Engine, EngineConfig};
-use std::{env, thread, time::{Duration, Instant}};
+use glam::UVec2;
+use std::{env, process, thread, time::{Duration, Instant}};
 use log::{debug, error, info, trace, warn};
-use vulkan::{entry::Entry, *};
+use vulkan::{entry::Entry, utils::physicalsize_to_uvec2, *};
 use winit::{
     application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, platform::{x11::EventLoopBuilderExtX11}};
 use winit::event::KeyEvent;
@@ -288,7 +289,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
         match event { 
             // On resize
             WindowEvent::Resized(..) => {
-                debug!("Window has been resized");
+                trace!("Window has been resized");
                 self.is_swapchain_dirty = true;
             }
             // Keyboard
@@ -362,10 +363,10 @@ impl<B: BindingTrait> ActiveContainer<B> {
         }
 
         if self.is_swapchain_dirty {
-            let dim = self.engine.window.inner_size();
-            if dim.width > 0 && dim.height > 0 {
+            let size = physicalsize_to_uvec2(self.engine.window.inner_size());
+            if size.cmpge(UVec2::ZERO).all() {
                 self.engine
-                    .recreate_swapchain(dim.width, dim.height)
+                    .recreate_swapchain(size)
                     .context("Failed to recreate swapchain")?;
                 binding.on_recreate_swapchain(&mut self.render_state, logic_state, &mut self.engine)
                     .context("Error on recreate swapchain callback")?;

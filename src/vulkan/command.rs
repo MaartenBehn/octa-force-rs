@@ -12,6 +12,8 @@ use crate::{
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::khr::{DynamicRendering, Synchronization2};
 
+use super::utils::uvec3_to_extend3d;
+
 #[derive(Debug)]
 pub struct CommandPool {
     device: Arc<Device>,
@@ -418,11 +420,7 @@ impl CommandBuffer {
                 mip_level: 0,
                 layer_count: 1,
             })
-            .extent(vk::Extent3D {
-                width: src_image.extent.width,
-                height: src_image.extent.height,
-                depth: 1,
-            });
+            .extent(uvec3_to_extend3d(src_image.size));
 
         unsafe {
             self.device.inner.cmd_copy_image(
@@ -444,7 +442,7 @@ impl CommandBuffer {
                 base_array_layer: 0,
                 layer_count: 1,
             })
-            .image_extent(dst.extent);
+            .image_extent(uvec3_to_extend3d(dst.size));
 
         unsafe {
             self.device.inner.cmd_copy_buffer_to_image(

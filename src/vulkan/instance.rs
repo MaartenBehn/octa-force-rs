@@ -1,5 +1,4 @@
 use std::{ffi::{c_char, c_void, CStr, CString}, fmt};
-
 use anyhow::{Context, Result};
 use ash::{
     ext::debug_utils::Instance as DebugUtils,
@@ -8,6 +7,8 @@ use ash::{
 };
 use log::{debug, info};
 use raw_window_handle::HasDisplayHandle;
+use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
+use super::entry::Entry;
 
 #[allow(deprecated)]
 use raw_window_handle::HasRawDisplayHandle;
@@ -15,12 +16,11 @@ use raw_window_handle::HasRawDisplayHandle;
 #[cfg(debug_assertions)]
 use anyhow::bail;
 
-use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
+#[cfg(debug_assertions)]
+use crate::{engine::EngineFeatureValue};
 
-use super::entry::Entry;
 
 const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
-
 
 #[allow(dead_code)]
 pub struct Instance {

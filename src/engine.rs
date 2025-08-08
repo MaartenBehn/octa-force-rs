@@ -1,10 +1,11 @@
 use anyhow::Context as _;
 use glam::UVec2;
-use log::{debug, info};
+use log::{debug, info, trace};
 use winit::window::Window;
 
 use crate::in_flight_frames::InFlightFrames;
 use crate::vulkan::entry::Entry;
+use crate::vulkan::utils::physicalsize_to_uvec2;
 use crate::vulkan::Context;
 use crate::{OctaResult, SemaphoreSubmitInfo};
 use crate::{controls::Controls, gui::Gui, hot_reloading::HotReloadConfig, stats::FrameStats, CommandBuffer, CommandPool, Swapchain};
@@ -111,8 +112,7 @@ impl Engine {
 
         let swapchain = Swapchain::new(
             &context,
-            window.inner_size().width,
-            window.inner_size().height,
+            physicalsize_to_uvec2(window.inner_size()),
         )?;
 
         let command_buffers = create_command_buffers(&command_pool, &swapchain)?;
@@ -140,14 +140,15 @@ impl Engine {
         })
     }
 
-    pub fn recreate_swapchain(&mut self, width: u32, height: u32) -> OctaResult<()> {
-        debug!("Recreating the swapchain");
+    pub fn recreate_swapchain(&mut self, size: UVec2) -> OctaResult<()> {
+        trace!("Recreating the swapchain");
 
         self.wait_for_gpu()?;
 
         // Swapchain and dependent resources
-        self.swapchain.resize(&self.context, width, height)?;
+        self.swapchain.resize(&self.context, size)?;
 
+        trace!("Recreating the swapchain done");
         Ok(())
     }
 

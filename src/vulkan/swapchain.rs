@@ -4,10 +4,11 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 use ash::vk::{ImageUsageFlags};
-use glam::{UVec2, uvec2};
+use glam::{UVec2};
 use gpu_allocator::MemoryLocation;
 
 use crate::in_flight_frames::InFlightFrames;
+use crate::vulkan::utils::{extent2d_to_uvec2, uvec2_to_extend2d};
 use crate::OctaResult;
 use crate::{vulkan::device::Device, vulkan::Queue, Context};
 use crate::vulkan::Image;
@@ -28,7 +29,7 @@ pub struct Swapchain {
 }
 
 impl Swapchain {
-    pub fn new(context: &Context, width: u32, height: u32) -> Result<Self> {
+    pub fn new(context: &Context, size: UVec2) -> Result<Self> {
         log::trace!("Creating vulkan swapchain");
 
         let device = context.device.clone();
@@ -44,18 +45,16 @@ impl Swapchain {
         };
 
         // Swapchain extent
-        let extent = {
+        let size = {
             if capabilities.current_extent.width != std::u32::MAX {
-                capabilities.current_extent
+                extent2d_to_uvec2(capabilities.current_extent)
             } else {
-                let min = capabilities.min_image_extent;
-                let max = capabilities.max_image_extent;
-                let width = width.min(max.width).max(min.width);
-                let height = height.min(max.height).max(min.height);
-                vk::Extent2D { width, height }
+                let min = extent2d_to_uvec2(capabilities.min_image_extent);
+                let max = extent2d_to_uvec2(capabilities.max_image_extent);
+                size.min(max).max(min)
             }
         };
-        log::info!("Swapchain size: {}x{}", extent.width, extent.height);
+        log::info!("Swapchain size: {size}");
 
         // Swapchain image count
         let image_count = capabilities.min_image_count + 1;
@@ -77,7 +76,7 @@ impl Swapchain {
                 .min_image_count(image_count)
                 .image_format(format.format)
                 .image_color_space(format.color_space)
-                .image_extent(extent)
+                .image_extent(uvec2_to_extend2d(size))
                 .image_array_layers(1);
 
                 builder = if context.swapchain_supports_storage() {
@@ -118,7 +117,7 @@ impl Swapchain {
                     context.allocator.clone(),
                     i,
                     format.format,
-                    extent,
+                    size,
                 );
                 let view = image.create_image_view(false).unwrap();
                 ImageAndView{ view, image }
@@ -132,8 +131,7 @@ impl Swapchain {
                     ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
                     MemoryLocation::GpuOnly,
                     depth_format,
-                    extent.width,
-                    extent.height,
+                    size,
                 ).unwrap();
                 let depth_view = depth_image.create_image_view(true).unwrap();
                 ImageAndView{ view: depth_view, image: depth_image }
@@ -144,7 +142,7 @@ impl Swapchain {
             device,
             inner,
             swapchain_khr,
-            size: uvec2(extent.width, extent.height),
+            size,
             format: format.format,
             depth_format,
             color_space: format.color_space,
@@ -154,8 +152,8 @@ impl Swapchain {
         })
     }
 
-    pub fn resize(&mut self, context: &Context, width: u32, height: u32) -> Result<()> {
-        log::info!("Resizing vulkan swapchain to {width}x{height}");
+    pub fn resize(&mut self, context: &Context, size: UVec2) -> Result<()> {
+        log::info!("Resizing vulkan swapchain to {size}");
 
         self.destroy();
 
@@ -170,15 +168,13 @@ impl Swapchain {
         };
 
         // Swapchain extent
-        let extent = {
+        self.size = {
             if capabilities.current_extent.width != std::u32::MAX {
-                capabilities.current_extent
+                extent2d_to_uvec2(capabilities.current_extent)
             } else {
-                let min = capabilities.min_image_extent;
-                let max = capabilities.max_image_extent;
-                let width = width.min(max.width).max(min.width);
-                let height = height.min(max.height).max(min.height);
-                vk::Extent2D { width, height }
+                let min = extent2d_to_uvec2(capabilities.min_image_extent);
+                let max = extent2d_to_uvec2(capabilities.max_image_extent);
+                size.min(max).max(min)
             }
         };
 
@@ -197,7 +193,7 @@ impl Swapchain {
                 .min_image_count(image_count)
                 .image_format(self.format)
                 .image_color_space(self.color_space)
-                .image_extent(extent)
+                .image_extent(uvec2_to_extend2d(self.size))
                 .image_array_layers(1);
 
             builder = if context.swapchain_supports_storage() {
@@ -237,7 +233,7 @@ impl Swapchain {
                     context.allocator.clone(),
                     i,
                     self.format,
-                    extent,
+                    self.size,
                 );
                 let view = image.create_image_view(false).unwrap();
                 ImageAndView{ view, image }
@@ -251,8 +247,7 @@ impl Swapchain {
                     ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
                     MemoryLocation::GpuOnly,
                     self.depth_format,
-                    extent.width,
-                    extent.height,
+                    self.size,
                 ).unwrap();
                 let depth_view = depth_image.create_image_view(true).unwrap();
                 ImageAndView{ view: depth_view, image: depth_image }
@@ -260,7 +255,6 @@ impl Swapchain {
             .collect::<Vec<_>>();
 
         self.swapchain_khr = swapchain_khr;
-        self.size = uvec2(extent.width, extent.height);
         self.images_and_views = images_and_views;
         self.depht_images_and_views = depht_images_and_views;
 

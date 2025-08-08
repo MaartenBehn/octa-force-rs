@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc, usize};
 use ash::vk;
 use index_pool::IndexPool;
-use log::trace;
+use log::{debug, trace};
 
 use crate::OctaResult;
 
@@ -74,49 +74,53 @@ impl DescriptorHeap {
 
     pub fn create_image_handle(&mut self, view: &ImageView, usage: vk::ImageUsageFlags) -> OctaResult<DescriptorHandle> {
         let handle = self.allocator.borrow_mut().new_id() as u32;
-
-        let img_info = vk::DescriptorImageInfo::default()
-            .image_view(view.inner);
-
-        let wds = vk::WriteDescriptorSet::default()
-            .dst_set(self.set.inner)
-            .dst_array_element(handle)
-            .descriptor_count(1);
-
+ 
         if usage.contains(vk::ImageUsageFlags::SAMPLED) {
-            let img_info = img_info.image_layout(
-                if usage.contains(vk::ImageUsageFlags::STORAGE) { 
-                    vk::ImageLayout::GENERAL 
-                } else { 
-                    vk::ImageLayout::READ_ONLY_OPTIMAL
-                }
-            );
+            let img_info = vk::DescriptorImageInfo::default()
+                .image_view(view.inner)
+                .image_layout(
+                    if usage.contains(vk::ImageUsageFlags::STORAGE) { 
+                        vk::ImageLayout::GENERAL 
+                    } else { 
+                        vk::ImageLayout::READ_ONLY_OPTIMAL
+                    }
+                );
 
             let binding_index = self.heap_types.iter()
                 .position(|t| t.ty == vk::DescriptorType::SAMPLED_IMAGE )
                 .ok_or(anyhow::anyhow!("Descriptor heap must have sampled image type!"))?;
 
-            let wds = wds.descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+            let wds = vk::WriteDescriptorSet::default()
+                .dst_set(self.set.inner)
+                .dst_array_element(handle)
+                .descriptor_count(1)
+                .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
                 .dst_binding(binding_index as _)
                 .image_info(std::slice::from_ref(&img_info));
             
-            trace!("Creating Sampled Image Handle {handle} with usage flags {usage:?} and layout {:?}", img_info.image_layout);
             unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
+            trace!("Creating Sampled Image Handle {handle} with usage flags {usage:?} and layout {:?}", img_info.image_layout);
         } 
 
         if usage.contains(vk::ImageUsageFlags::STORAGE) {
-            let img_info = img_info.image_layout(vk::ImageLayout::GENERAL);
+            let img_info = vk::DescriptorImageInfo::default()
+                .image_view(view.inner)
+                .image_layout(vk::ImageLayout::GENERAL);
 
             let binding_index = self.heap_types.iter()
                 .position(|t| t.ty == vk::DescriptorType::STORAGE_IMAGE )
                 .ok_or(anyhow::anyhow!("Descriptor heap must have storage image type!"))?;
 
-            let wds = wds.descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
+            let wds = vk::WriteDescriptorSet::default()
+                .dst_set(self.set.inner)
+                .dst_array_element(handle)
+                .descriptor_count(1)
+                .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
                 .dst_binding(binding_index as _)
                 .image_info(std::slice::from_ref(&img_info));
-            
-            trace!("Creating Storage Image Handle {handle} with usage flags {usage:?} and layout {:?}", img_info.image_layout);
+ 
             unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
+            trace!("Creating Storage Image Handle {handle} with usage flags {usage:?} and layout {:?}", img_info.image_layout);
         } 
 
         Ok(DescriptorHandle { value: handle, allocator: self.allocator.clone() })
@@ -134,6 +138,7 @@ impl Context {
 
 impl Drop for DescriptorHandle {
     fn drop(&mut self) {
+        debug!("Dropping Image Handle");
         self.allocator.borrow_mut().return_id(self.value as usize)
             .expect("Dropped DescriptorHandle with already retured value");
     }

@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use ash::vk::{self};
+use glam::{UVec2, UVec3};
 use gpu_allocator::vulkan::AllocationScheme;
 use gpu_allocator::{
     vulkan::{Allocation, AllocationCreateDesc, Allocator},
@@ -10,6 +11,7 @@ use gpu_allocator::{
 };
 use log::trace;
 
+use crate::vulkan::utils::uvec3_to_extend3d;
 use crate::{vulkan::device::Device, Context};
 use crate::vulkan::align::Align;
 
@@ -20,7 +22,7 @@ pub struct Image {
     pub(crate) inner: vk::Image,
     allocation: Option<Allocation>,
     pub format: vk::Format,
-    pub extent: vk::Extent3D,
+    pub size: UVec3,
     is_swapchain: bool, // if set, image should not be destroyed
 }
 
@@ -37,21 +39,16 @@ impl Image {
         usage: vk::ImageUsageFlags,
         memory_location: MemoryLocation,
         format: vk::Format,
-        width: u32,
-        height: u32,
+        size: UVec2,
     ) -> Result<Self> {
-        trace!("Creating Image: {width}x{height} with usage flags {usage:?} at memory location {memory_location:?}");
+        trace!("Creating Image: {size} with usage flags {usage:?} at memory location {memory_location:?}");
 
-        let extent = vk::Extent3D {
-            width,
-            height,
-            depth: 1,
-        };
-
+        let size = UVec3::from((size, 1));
+        
         let image_info = vk::ImageCreateInfo::default()
             .image_type(vk::ImageType::TYPE_2D)
             .format(format)
-            .extent(extent)
+            .extent(uvec3_to_extend3d(size))
             .mip_levels(1)
             .array_layers(1)
             .samples(vk::SampleCountFlags::TYPE_1)
@@ -82,7 +79,7 @@ impl Image {
             inner,
             allocation: Some(allocation),
             format,
-            extent,
+            size,
             is_swapchain: false,
         })
     }
@@ -94,19 +91,14 @@ impl Image {
         usage: vk::ImageUsageFlags,
         memory_location: MemoryLocation,
         format: vk::Format,
-        width: u32,
-        height: u32,
+        size: UVec2
     ) -> Result<Self> {
-        let extent = vk::Extent3D {
-            width,
-            height,
-            depth: 1,
-        };
-
+        let size = UVec3::from((size, 1));
+       
         let image_info = vk::ImageCreateInfo::default()
             .image_type(vk::ImageType::TYPE_2D)
             .format(format)
-            .extent(extent)
+            .extent(uvec3_to_extend3d(size))
             .array_layers(6)
             .mip_levels(1)
             .samples(vk::SampleCountFlags::TYPE_1)
@@ -137,7 +129,7 @@ impl Image {
             inner,
             allocation: Some(allocation),
             format,
-            extent,
+            size,
             is_swapchain: false,
         })
     }
@@ -148,13 +140,9 @@ impl Image {
         allocator: Arc<Mutex<Allocator>>,
         swapchain_image: vk::Image,
         format: vk::Format,
-        extent: vk::Extent2D,
+        size: UVec2,
     ) -> Self {
-        let extent = vk::Extent3D {
-            width: extent.width,
-            height: extent.height,
-            depth: 1,
-        };
+        let size = UVec3::from((size, 1));
 
         Self {
             device,
@@ -162,7 +150,7 @@ impl Image {
             inner: swapchain_image,
             allocation: None,
             format,
-            extent,
+            size,
             is_swapchain: true,
         }
     }
@@ -227,8 +215,7 @@ impl Context {
         usage: vk::ImageUsageFlags,
         memory_location: MemoryLocation,
         format: vk::Format,
-        width: u32,
-        height: u32,
+        size: UVec2,
     ) -> Result<Image> {
         Image::new_2d(
             self.device.clone(),
@@ -236,8 +223,7 @@ impl Context {
             usage,
             memory_location,
             format,
-            width,
-            height,
+            size,
         )
     }
 }

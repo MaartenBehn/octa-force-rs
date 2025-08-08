@@ -1,10 +1,11 @@
 use std::mem::{align_of, size_of_val};
 
 use anyhow::Result;
-use ash::vk;
+use ash::vk::{self, Extent2D, Extent3D};
 use ash::vk::ImageUsageFlags;
-use glam::UVec2;
+use glam::{uvec2, uvec3, UVec2, UVec3};
 use gpu_allocator::MemoryLocation;
+use winit::dpi::PhysicalSize;
 
 use crate::vulkan::{CommandBuffer, Image, ImageBarrier};
 use crate::{Buffer, Context};
@@ -78,7 +79,7 @@ impl Context {
 
     pub fn create_storage_images(
         &self,
-        res: UVec2,
+        size: UVec2,
         count: usize,
     ) -> Result<Vec<ImageAndView>> {
         let mut images = Vec::with_capacity(count);
@@ -88,8 +89,7 @@ impl Context {
                 vk::ImageUsageFlags::TRANSFER_SRC | vk::ImageUsageFlags::STORAGE,
                 MemoryLocation::GpuOnly,
                 self.physical_device.render_storage_image_format,
-                res.x,
-                res.y,
+                size,
             )?;
 
             let view = image.create_image_view(false)?;
@@ -144,8 +144,7 @@ impl Context {
             ImageUsageFlags::TRANSFER_DST | ImageUsageFlags::SAMPLED,
             MemoryLocation::GpuOnly,
             format,
-            image_size.x,
-            image_size.y,
+            image_size,
         )?;
 
         let view = image.create_image_view(false)?;
@@ -194,8 +193,7 @@ impl Context {
             ImageUsageFlags::TRANSFER_DST | ImageUsageFlags::SAMPLED,
             MemoryLocation::GpuOnly,
             image_format,
-            image_size.x,
-            image_size.y,
+            image_size,
         )?;
 
         let view = image.create_image_view(false)?;
@@ -369,4 +367,24 @@ impl CommandBuffer {
 
         Ok(())
     }
+}
+
+pub fn extent2d_to_uvec2(extent: Extent2D) -> UVec2 {
+    uvec2(extent.width, extent.height)
+}
+
+pub fn extent3d_to_uvec3(extent: Extent3D) -> UVec3 {
+    uvec3(extent.width, extent.height, extent.depth)
+}
+
+pub fn uvec2_to_extend2d(vec: UVec2) -> Extent2D {
+    Extent2D { width: vec.x, height: vec.y }
+}
+
+pub fn uvec3_to_extend3d(vec: UVec3) -> Extent3D {
+    Extent3D { width: vec.x, height: vec.y, depth: vec.z }
+}
+
+pub fn physicalsize_to_uvec2(size: PhysicalSize<u32>) -> UVec2 {
+    uvec2(size.width, size.height)
 }
