@@ -138,7 +138,6 @@ impl Context {
 
 impl Drop for DescriptorHandle {
     fn drop(&mut self) {
-        debug!("Dropping Image Handle");
         self.allocator.borrow_mut().return_id(self.value as usize)
             .expect("Dropped DescriptorHandle with already retured value");
     }
