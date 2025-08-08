@@ -1,4 +1,5 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc, usize};
+use anyhow::bail;
 use ash::vk;
 use index_pool::IndexPool;
 use log::{debug, trace};
@@ -8,25 +9,36 @@ use crate::OctaResult;
 use super::{Context, DescriptorPool, DescriptorSet, DescriptorSetLayout, Device, ImageView};
 
 #[derive(Debug)]
-pub struct DescriptorHeap {
+pub struct ImageDescriptorHeap {
     device: Arc<Device>,
-    pub heap_types: Vec<vk::DescriptorPoolSize>,
     pub pool: DescriptorPool,
     pub layout: DescriptorSetLayout,
     pub set: DescriptorSet,
     allocator: Rc<RefCell<IndexPool>>,
+    size: usize,
 }
 
 pub type DescriptorHandleValue = u32;
 
 #[derive(Debug)]
-pub struct DescriptorHandle {
+pub struct ImageDescriptorHandle {
     pub value: DescriptorHandleValue,
     allocator: Rc<RefCell<IndexPool>>
 }
 
-impl DescriptorHeap {
-    pub(crate) fn new(device: Arc<Device>, heap_types: Vec<vk::DescriptorPoolSize>) -> OctaResult<Self> {
+impl ImageDescriptorHeap {
+    pub(crate) fn new(device: Arc<Device>, size: usize) -> OctaResult<Self> {
+
+        let heap_types = vec![
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::SAMPLED_IMAGE,
+                descriptor_count: size as u32,
+            },
+            vk::DescriptorPoolSize {
+                ty: vk::DescriptorType::STORAGE_IMAGE,
+                descriptor_count: size as u32,
+            },
+        ];
         
         let pool = DescriptorPool::new(
             device.clone(), 
@@ -64,17 +76,20 @@ impl DescriptorHeap {
 
         Ok(Self {
             device,
-            heap_types,
             pool,
             layout,
             set,
             allocator,
+            size,
         })
     }
 
-    pub fn create_image_handle(&mut self, view: &ImageView, usage: vk::ImageUsageFlags) -> OctaResult<DescriptorHandle> {
+    pub fn create_image_handle(&mut self, view: &ImageView, usage: vk::ImageUsageFlags) -> OctaResult<ImageDescriptorHandle> {
         let handle = self.allocator.borrow_mut().new_id() as u32;
- 
+        if handle >= self.size as u32 {
+            bail!("Descriptor Heap of size {} full!", self.size);
+        }
+
         if usage.contains(vk::ImageUsageFlags::SAMPLED) {
             let img_info = vk::DescriptorImageInfo::default()
                 .image_view(view.inner)
@@ -86,16 +101,12 @@ impl DescriptorHeap {
                     }
                 );
 
-            let binding_index = self.heap_types.iter()
-                .position(|t| t.ty == vk::DescriptorType::SAMPLED_IMAGE )
-                .ok_or(anyhow::anyhow!("Descriptor heap must have sampled image type!"))?;
-
             let wds = vk::WriteDescriptorSet::default()
                 .dst_set(self.set.inner)
                 .dst_array_element(handle)
                 .descriptor_count(1)
                 .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
-                .dst_binding(binding_index as _)
+                .dst_binding(0) // The index in heap_types
                 .image_info(std::slice::from_ref(&img_info));
             
             unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
@@ -107,36 +118,32 @@ impl DescriptorHeap {
                 .image_view(view.inner)
                 .image_layout(vk::ImageLayout::GENERAL);
 
-            let binding_index = self.heap_types.iter()
-                .position(|t| t.ty == vk::DescriptorType::STORAGE_IMAGE )
-                .ok_or(anyhow::anyhow!("Descriptor heap must have storage image type!"))?;
-
             let wds = vk::WriteDescriptorSet::default()
                 .dst_set(self.set.inner)
                 .dst_array_element(handle)
                 .descriptor_count(1)
                 .descriptor_type(vk::DescriptorType::STORAGE_IMAGE)
-                .dst_binding(binding_index as _)
+                .dst_binding(1) // The index in heap_types
                 .image_info(std::slice::from_ref(&img_info));
- 
+
             unsafe { self.device.inner.update_descriptor_sets(&[wds], &[]) };
             trace!("Creating Storage Image Handle {handle} with usage flags {usage:?} and layout {:?}", img_info.image_layout);
         } 
 
-        Ok(DescriptorHandle { value: handle, allocator: self.allocator.clone() })
+        Ok(ImageDescriptorHandle { value: handle, allocator: self.allocator.clone() })
     }
 }
 
 impl Context {
     pub fn create_descriptor_heap(
         &self,
-        heap_types: Vec<vk::DescriptorPoolSize>,
-    ) -> OctaResult<DescriptorHeap> {
-        DescriptorHeap::new(self.device.clone(), heap_types)
+        size: usize,
+    ) -> OctaResult<ImageDescriptorHeap> {
+        ImageDescriptorHeap::new(self.device.clone(), size)
     }
 }
 
-impl Drop for DescriptorHandle {
+impl Drop for ImageDescriptorHandle {
     fn drop(&mut self) {
         self.allocator.borrow_mut().return_id(self.value as usize)
             .expect("Dropped DescriptorHandle with already retured value");

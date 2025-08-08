@@ -48,6 +48,5 @@ index-pool = "1.0.11"
 
 itertools = "0.14.0"
 
-
 [build-dependencies]
 ash = { version = "0.38", features = ["linked"] }
