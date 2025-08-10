@@ -5,7 +5,7 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Instance as AshInstance,
 };
-use log::{debug, info};
+use log::{debug, info, warn};
 use raw_window_handle::HasDisplayHandle;
 use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
 use super::entry::Entry;
@@ -75,7 +75,9 @@ impl Instance {
                 validation_layers = true;
 
             } else if engine_config.validation_layers == EngineFeatureValue::Needed {
-                bail!("Validation Layers are needed but not supported by hardware.")
+                bail!("Validation Layers are needed but not supported by hardware.");
+            } else {
+                warn!("Validation Layers not supported by hardware. -> Disableing");
             }
         }
 
@@ -94,6 +96,8 @@ impl Instance {
                 debug_printing = true;
             } else if engine_config.shader_debug_printing == EngineFeatureValue::Needed {
                 bail!("Debug Printing is needed but not supported by hardware.")
+            } else {
+                warn!("Debug Printing not supported by hardware. -> Disableing");
             }
         }
 
