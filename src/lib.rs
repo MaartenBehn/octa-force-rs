@@ -89,8 +89,9 @@ fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
       
     let mut event_loop_builder = EventLoop::builder();
     
-    // Fallback to X11 when wayland is not supported by vulkan 
-    if cfg!(target_os = "linux") && !global_container.entry.supports_wayland()? {
+    // Fallback to X11 when wayland is not supported by vulkan
+    #[cfg(target_os = "linux")]
+    if !global_container.entry.supports_wayland()? {
         warn!("Wayland is not supported by Vulkan. Falling back to X11.");
         
         winit::platform::x11::EventLoopBuilderExtX11::with_x11(&mut event_loop_builder);
