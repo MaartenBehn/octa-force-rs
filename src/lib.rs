@@ -28,20 +28,15 @@ use anyhow::{bail, Context as _};
 use engine::{Engine, EngineConfig};
 use glam::UVec2;
 use std::{env, process, thread, time::{Duration, Instant}};
-use log::{debug, error, info, trace, warn};
+use log::{error, info, trace, warn};
 use vulkan::{entry::Entry, utils::physicalsize_to_uvec2, *};
 use winit::{
-    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}, platform::{x11::EventLoopBuilderExtX11}};
+    application::ApplicationHandler, event::{ElementState, MouseButton, WindowEvent}, event_loop::{ActiveEventLoop, ControlFlow, EventLoop}};
 use winit::event::KeyEvent;
 use winit::keyboard::{KeyCode, PhysicalKey};
-
-#[cfg(debug_assertions)]
-use std::mem;
-
 use crate::binding::{get_binding, Binding};
 use crate::binding::r#trait::BindingTrait;
 use crate::logger::{log_init};
-
 
 pub type OctaResult<V> = anyhow::Result<V>;
 
@@ -98,7 +93,7 @@ fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
     if cfg!(target_os = "linux") && !global_container.entry.supports_wayland()? {
         warn!("Wayland is not supported by Vulkan. Falling back to X11.");
         
-        event_loop_builder.with_x11();
+        winit::platform::x11::EventLoopBuilderExtX11::with_x11(&mut event_loop_builder);
     }
 
     let event_loop = event_loop_builder.build()?;
@@ -353,7 +348,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
                 b.lib_reloader.update()?;
                 binding.init_hot_reload()?;
                 let mut render_state = binding.new_render_state(logic_state, &mut self.engine)?;
-                mem::swap(&mut render_state, &mut self.render_state);
+                std::mem::swap(&mut render_state, &mut self.render_state);
 
                 // Droppeing memory created in lib will frezze the game so we just keep it.
                 _dropped_render_state.push(render_state);
