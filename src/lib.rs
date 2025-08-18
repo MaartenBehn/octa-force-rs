@@ -27,7 +27,7 @@ pub mod in_flight_frames;
 use anyhow::{bail, Context as _};
 use engine::{Engine, EngineConfig};
 use glam::UVec2;
-use std::{env, process, thread, time::{Duration, Instant}};
+use std::{env, thread, time::{Duration, Instant}};
 use log::{error, info, trace, warn};
 use vulkan::{entry::Entry, utils::physicalsize_to_uvec2, *};
 use winit::{
@@ -64,11 +64,12 @@ struct ActiveContainer<B: BindingTrait> {
 }
 
 pub fn run<B: BindingTrait>(engine_config: EngineConfig) { 
-    unsafe {
-        env::set_var("RUST_BACKTRACE", "1");
-        //std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+    if engine_config.backtrace {
+        unsafe {
+            env::set_var("RUST_BACKTRACE", "1");
+        }
     }
-
+    
     let res = log_init();
     if res.is_err() {
         let err = res.unwrap_err();
@@ -107,7 +108,7 @@ fn run_iternal<B: BindingTrait>(engine_config: EngineConfig) -> OctaResult<()> {
     if let Binding::HotReload(b) = global_container.binding {            
         if b.active {
             // Killing process because normal dropping would freeze the window.
-            process::exit(0);
+            std::process::exit(0);
         }
     }
      

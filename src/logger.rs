@@ -17,7 +17,7 @@ pub fn log_init() -> OctaResult<()> {
         .add_filter_ignore(format!("{}", "egui"))
         .add_filter_ignore(format!("{}", "calloop"))
         .add_filter_ignore(format!("{}", "arboard"))
-        .set_time_to_local(true)
+        .set_time_offset_to_local().expect("Failed to set Time Zone!")
         .build();
 
     let _ = fs::remove_file("trace.log"); 

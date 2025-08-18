@@ -36,6 +36,12 @@ pub struct Context {
     #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
     pub(crate) dynamic_rendering: DynamicRendering
 }
+
+pub struct AllocContext {
+    pub allocator: Arc<Mutex<Allocator>>,
+    pub device: Arc<Device>,
+}
+
 impl Context {
     pub fn new<'a>(
         entry: Entry,
@@ -287,6 +293,13 @@ impl Context {
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
             dynamic_rendering
         })
+    }
+
+    pub fn get_alloc_context(&self) -> AllocContext {
+        AllocContext {
+            allocator: self.allocator.clone(),
+            device: self.device.clone(),
+        }
     }
 }
 

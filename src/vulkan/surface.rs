@@ -6,6 +6,7 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::vulkan::instance::Instance;
 
+#[derive(Clone)]
 pub struct Surface {
     pub(crate) inner: surface::Instance,
     pub surface_khr: vk::SurfaceKHR,

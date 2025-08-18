@@ -1,6 +1,6 @@
 use anyhow::Context as _;
 use glam::UVec2;
-use log::{debug, info, trace};
+use log::{info, trace};
 use winit::window::Window;
 
 use crate::in_flight_frames::InFlightFrames;
@@ -35,6 +35,7 @@ pub struct EngineConfig {
     pub name: String,
     pub start_size: UVec2,
 
+    pub backtrace: bool,
     pub ray_tracing: EngineFeatureValue,
     pub compute_rendering: EngineFeatureValue,
     pub validation_layers: EngineFeatureValue,
@@ -68,7 +69,8 @@ impl Default for EngineConfig {
             required_device_features: vec![], 
             wanted_device_features: vec![], 
             hot_reload_config: None, 
-            num_frames_in_flight: 2 
+            num_frames_in_flight: 2,
+            backtrace: true,
         }
     }
 }

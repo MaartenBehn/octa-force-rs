@@ -149,7 +149,7 @@ impl FrameStats {
     }
 }
 
-fn build_frametime_plot(ui: &mut egui::Ui, id: impl std::hash::Hash, points: &[f32]) {
+fn build_frametime_plot(ui: &mut egui::Ui, id: &str, points: &[f32]) {
     let points: egui_plot::PlotPoints = points
         .iter()
         .enumerate()
@@ -166,7 +166,7 @@ fn build_frametime_plot(ui: &mut egui::Ui, id: impl std::hash::Hash, points: &[f
         .allow_zoom(false)
         .show_axes([false, true])
         .show(ui, |plot| {
-            plot.line(egui_plot::Line::new(points));
+            plot.line(egui_plot::Line::new(id, points));
         });
 }
 

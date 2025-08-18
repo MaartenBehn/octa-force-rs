@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc, sync::Arc, usize};
 use anyhow::bail;
 use ash::vk;
 use index_pool::IndexPool;
-use log::{debug, trace};
+use log::{trace};
 
 use crate::OctaResult;
 

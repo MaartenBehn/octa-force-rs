@@ -51,7 +51,7 @@ impl QueueFamily {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Queue {
     pub inner: vk::Queue,
 

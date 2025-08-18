@@ -5,24 +5,15 @@ use ash::{
     vk::{self, DebugUtilsMessengerEXT},
     Instance as AshInstance,
 };
-use log::{debug, info, warn};
+use log::{debug, info};
 use raw_window_handle::HasDisplayHandle;
 use crate::{vulkan::physical_device::PhysicalDeviceCapabilities, EngineConfig};
 use super::entry::Entry;
 
-#[allow(deprecated)]
-use raw_window_handle::HasRawDisplayHandle;
-
-#[cfg(debug_assertions)]
-use anyhow::bail;
-
-#[cfg(debug_assertions)]
-use crate::{engine::EngineFeatureValue};
-
-
 const REQUIRED_DEBUG_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct Instance {
     pub(crate) inner: AshInstance,
     debug_report_callback: Option<(DebugUtils, DebugUtilsMessengerEXT)>,
@@ -53,7 +44,7 @@ impl Instance {
 
         #[allow(deprecated)]
         let mut extension_names =
-            ash_window::enumerate_required_extensions(display_handle.raw_display_handle()?)?
+            ash_window::enumerate_required_extensions(raw_window_handle::HasRawDisplayHandle::raw_display_handle(&display_handle)?)?
                 .to_vec();
 
         let mut instance_create_info = vk::InstanceCreateInfo::default()
@@ -67,17 +58,17 @@ impl Instance {
         #[cfg(debug_assertions)]
         let (_layer_names, layer_names_ptrs) = get_validation_layer_names_and_pointers();
         #[cfg(debug_assertions)]
-        if engine_config.validation_layers != EngineFeatureValue::NotUsed {
+        if engine_config.validation_layers != crate::engine::EngineFeatureValue::NotUsed {
             
             if entry.check_layer_support(&REQUIRED_DEBUG_LAYERS)? {
                 extension_names.push(ash::ext::debug_utils::NAME.as_ptr());
                 instance_create_info = instance_create_info.enabled_layer_names(&layer_names_ptrs);
                 validation_layers = true;
 
-            } else if engine_config.validation_layers == EngineFeatureValue::Needed {
-                bail!("Validation Layers are needed but not supported by hardware.");
+            } else if engine_config.validation_layers == crate::engine::EngineFeatureValue::Needed {
+                anyhow::bail!("Validation Layers are needed but not supported by hardware.");
             } else {
-                warn!("Validation Layers not supported by hardware. -> Disableing");
+                log::warn!("Validation Layers not supported by hardware. -> Disableing");
             }
         }
 
@@ -89,15 +80,15 @@ impl Instance {
         #[cfg(debug_assertions)]
         let mut validation_features = vk::ValidationFeaturesEXT::default();
         #[cfg(debug_assertions)]
-        if engine_config.shader_debug_printing != EngineFeatureValue::NotUsed {
+        if engine_config.shader_debug_printing != crate::engine::EngineFeatureValue::NotUsed {
             if validation_layers {
                 validation_features = validation_features.enabled_validation_features(&[vk::ValidationFeatureEnableEXT::DEBUG_PRINTF]);
                 instance_create_info = instance_create_info.push_next(&mut validation_features);
                 debug_printing = true;
-            } else if engine_config.shader_debug_printing == EngineFeatureValue::Needed {
-                bail!("Debug Printing is needed but not supported by hardware.")
+            } else if engine_config.shader_debug_printing == crate::engine::EngineFeatureValue::Needed {
+                anyhow::bail!("Debug Printing is needed but not supported by hardware.")
             } else {
-                warn!("Debug Printing not supported by hardware. -> Disableing");
+                log::warn!("Debug Printing not supported by hardware. -> Disableing");
             }
         }
 

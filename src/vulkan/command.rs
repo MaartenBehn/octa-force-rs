@@ -14,7 +14,7 @@ use ash::khr::{DynamicRendering, Synchronization2};
 
 use super::utils::uvec3_to_extend3d;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommandPool {
     device: Arc<Device>,
     ray_tracing: Option<Arc<RayTracingContext>>,

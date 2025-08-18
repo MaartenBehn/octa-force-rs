@@ -14,6 +14,8 @@ use gpu_allocator::{
     MemoryLocation,
 };
 
+use super::AllocContext;
+
 #[derive(Debug)]
 pub struct Buffer {
     device: Arc<Device>,
@@ -163,6 +165,23 @@ impl Buffer {
 }
 
 impl Context {
+    pub fn create_buffer(
+        &self,
+        usage: vk::BufferUsageFlags,
+        memory_location: MemoryLocation,
+        size: vk::DeviceSize,
+    ) -> Result<Buffer> {
+        Buffer::new(
+            self.device.clone(),
+            self.allocator.clone(),
+            usage,
+            memory_location,
+            size,
+        )
+    }
+}
+
+impl AllocContext {
     pub fn create_buffer(
         &self,
         usage: vk::BufferUsageFlags,
