@@ -48,6 +48,15 @@ pub trait BindingTrait: fmt::Debug {
         Ok(())
     }
 
+    fn record_ui_commands(
+        ctx: &egui::Context, 
+        logic_state: &mut Self::LogicState,
+        render_state: &mut Self::RenderState,
+    ) -> OctaResult<()> {
+
+        Ok(())
+    }
+
     fn on_window_event(
         logic_state: &mut Self::LogicState,
         render_state: &mut Self::RenderState,

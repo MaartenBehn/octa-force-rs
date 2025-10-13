@@ -1,7 +1,7 @@
 use std::mem::{align_of, size_of_val};
 
 use anyhow::Result;
-use ash::vk::{self, Extent2D, Extent3D};
+use ash::vk::{self, Extent2D, Extent3D, Offset2D, Offset3D};
 use ash::vk::ImageUsageFlags;
 use glam::{uvec2, uvec3, UVec2, UVec3};
 use gpu_allocator::MemoryLocation;
@@ -270,16 +270,18 @@ impl CommandBuffer {
         &self,
         storage_image: &Image,
         swapchain_image: &Image,
+        offset: UVec2,
     ) -> Result<()> {
-        self.swapchain_image_copy_form_storage_image(storage_image, swapchain_image, vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR)
+        self.swapchain_image_copy_form_storage_image(storage_image, swapchain_image, vk::PipelineStageFlags2::RAY_TRACING_SHADER_KHR, offset)
     }
 
     pub fn swapchain_image_copy_from_compute_storage_image(
         &self,
         storage_image: &Image,
         swapchain_image: &Image,
+        offset: UVec2,
     ) -> Result<()> {
-        self.swapchain_image_copy_form_storage_image(storage_image, swapchain_image, vk::PipelineStageFlags2::COMPUTE_SHADER)
+        self.swapchain_image_copy_form_storage_image(storage_image, swapchain_image, vk::PipelineStageFlags2::COMPUTE_SHADER, offset)
     }
     
     fn swapchain_image_copy_form_storage_image(
@@ -287,6 +289,7 @@ impl CommandBuffer {
         storage_image: &Image,
         swapchain_image: &Image,
         storage_src_stage_mask: vk::PipelineStageFlags2,
+        offset: UVec2,
     ) -> Result<()> {
         self.pipeline_image_barriers(&[
             ImageBarrier {
@@ -314,6 +317,7 @@ impl CommandBuffer {
             vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
             swapchain_image,
             vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            offset,
         );
 
         self.pipeline_image_barriers(&[
@@ -383,6 +387,18 @@ pub fn uvec2_to_extend2d(vec: UVec2) -> Extent2D {
 
 pub fn uvec3_to_extend3d(vec: UVec3) -> Extent3D {
     Extent3D { width: vec.x, height: vec.y, depth: vec.z }
+}
+
+pub fn uvec2_to_offset2d(vec: UVec2) -> Offset2D {
+    Offset2D { x: vec.x as i32, y: vec.y as i32 }
+}
+
+pub fn uvec2_to_offset3d(vec: UVec2) -> Offset3D {
+    Offset3D { x: vec.x as i32, y: vec.y as i32, z: 0 }
+}
+
+pub fn uvec3_to_offset3d(vec: UVec3) -> Offset3D {
+    Offset3D { x: vec.x as i32, y: vec.y as i32, z: vec.z as i32 }
 }
 
 pub fn physicalsize_to_uvec2(size: PhysicalSize<u32>) -> UVec2 {

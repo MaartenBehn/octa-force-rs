@@ -27,6 +27,7 @@ pub mod in_flight_frames;
 use anyhow::{bail, Context as _};
 use engine::{Engine, EngineConfig};
 use glam::UVec2;
+use gui::Gui;
 use std::{env, thread, time::{Duration, Instant}};
 use log::{error, info, trace, warn};
 use vulkan::{entry::Entry, utils::physicalsize_to_uvec2, *};
@@ -231,6 +232,7 @@ impl<B: BindingTrait> ActiveContainer<B> {
     ) -> OctaResult<Self> {
 
         let mut engine = Engine::new(entry, &event_loop, &engine_config)?;
+
         let render_state = binding.new_render_state(logic_state, &mut engine)?;
         
         let is_swapchain_dirty = false;
@@ -278,8 +280,8 @@ impl<B: BindingTrait> ActiveContainer<B> {
         
         // Send Event to Controls Struct
         self.engine.controls.window_event(&event);
+        self.engine.gui.handle_event(&self.engine.window, &event);
 
-        self.engine.stats_gui.handle_event(&self.engine.window, &event);
         binding.on_window_event(&mut self.render_state, logic_state, &mut self.engine, &event)
             .context("Failed in On Window Event")?;
         
@@ -352,8 +354,10 @@ impl<B: BindingTrait> ActiveContainer<B> {
                 let mut render_state = binding.new_render_state(logic_state, &mut self.engine)?;
                 std::mem::swap(&mut render_state, &mut self.render_state);
 
+                drop(render_state);
+
                 // Droppeing memory created in lib will frezze the game so we just keep it.
-                _dropped_render_state.push(render_state);
+                //_dropped_render_state.push(render_state);
 
                 info!("Hot Reload done");
             }

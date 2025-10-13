@@ -1,6 +1,6 @@
 use anyhow::Context as _;
 use glam::UVec2;
-use log::{info, trace};
+use log::{error, info, trace};
 use winit::window::Window;
 
 use crate::in_flight_frames::InFlightFrames;
@@ -78,8 +78,8 @@ impl Default for EngineConfig {
 #[derive(Debug)]
 pub struct Engine {
     pub frame_stats: FrameStats,
-    pub(crate) stats_gui: Gui,
     pub window: Window,
+    pub gui: Gui,
 
     pub controls: Controls,
     
@@ -127,8 +127,14 @@ impl Engine {
         let controls = Controls::default();
         
         let frame_stats = FrameStats::new();
-        let stats_gui = Gui::new(&context, swapchain.format, swapchain.depth_format,  &window, engine_config.num_frames_in_flight)?;
-        
+
+        let gui = Gui::new(
+            &context, 
+            swapchain.format, 
+            swapchain.depth_format,
+            &window,
+            engine_config.num_frames_in_flight)?;
+                
         Ok(Self {
             window,
             context,
@@ -138,7 +144,7 @@ impl Engine {
             in_flight_frames,
             controls,
             frame_stats,
-            stats_gui,
+            gui,
         })
     }
 
@@ -225,7 +231,12 @@ impl Engine {
         Ok(false)
     }
 
-    pub fn record_command_buffer<B: BindingTrait>(&mut self, binding: &Binding<B>, render_state: &mut B::RenderState, logic_state: &mut B::LogicState) -> OctaResult<()> {
+    pub fn record_command_buffer<B: BindingTrait>(
+        &mut self, 
+        binding: &Binding<B>, 
+        render_state: &mut B::RenderState, 
+        logic_state: &mut B::LogicState,
+    ) -> OctaResult<()> {
         #[cfg(debug_assertions)]
         puffin::profile_function!();
 
@@ -241,16 +252,16 @@ impl Engine {
 
         {
             #[cfg(debug_assertions)]
-            puffin::profile_scope!("render app");
+            puffin::profile_scope!("record render commands");
 
             binding.record_render_commands(render_state, logic_state, self)?;
         }
 
         let buffer = &self.command_buffers[self.in_flight_frames.in_flight_index];
 
-        if self.frame_stats.stats_display_mode != StatsDisplayMode::None {
+        {
             #[cfg(debug_assertions)]
-            puffin::profile_scope!("render stats");
+            puffin::profile_scope!("render ui");
 
             buffer.begin_rendering(
                 &self.get_current_swapchain_image_and_view().view,
@@ -260,17 +271,34 @@ impl Engine {
                 None,
             );
 
-            self.stats_gui.cmd_draw(
+            self.gui.cmd_draw(
                 buffer, 
                 self.swapchain.size,
                 self.in_flight_frames.in_flight_index,
                 &self.window, 
                 &self.context,
                 |ctx| {
-                    self.frame_stats.build_perf_ui(ctx);
+                    {
+                        #[cfg(debug_assertions)]
+                        puffin::profile_scope!("record ui commands");
+
+                        let err = binding.record_ui_commands(ctx, render_state, logic_state);
+
+                        if let Err(err) = err {
+                            error!("{:#}", err);
+                            trace!("{}", err.backtrace());
+                        };
+                    }
+
+                    {
+                        #[cfg(debug_assertions)]
+                        puffin::profile_scope!("record perf ui");
+
+                        self.frame_stats.build_perf_ui(ctx);
+                    }
                 }
             )?;
-            
+
             buffer.end_rendering();
         }
 

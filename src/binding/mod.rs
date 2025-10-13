@@ -36,13 +36,15 @@ impl<B: BindingTrait> Binding<B> {
 
     #[cfg(debug_assertions)]
     pub fn init_hot_reload(&self) -> OctaResult<()> {
+        use log::LevelFilter;
+
         match self {
             Binding::HotReload(b) => {
                 if b.active {
                     unsafe {
-                        let call: Symbol<unsafe extern "C" fn(&'static dyn Log) -> OctaResult<()>> =
+                        let call: Symbol<unsafe extern "C" fn(&'static dyn Log, LevelFilter) -> OctaResult<()>> =
                             b.lib_reloader.get_symbol("init_hot_reload")?;
-                        return call(log::logger())
+                        return call(log::logger(), log::max_level())
                     }
                 }
             }
@@ -151,6 +153,34 @@ impl<B: BindingTrait> Binding<B> {
             }
             Binding::Static(_) => {
                 B::record_render_commands(logic_state, render_state, engine)
+            }
+        }
+    }
+
+    pub fn record_ui_commands(
+        &self,
+        ctx: &egui::Context,
+        render_state: &mut B::RenderState,
+        logic_state: &mut B::LogicState,
+    ) -> OctaResult<()> {
+        #[cfg(not(debug_assertions))]
+        return B::record_ui_commands(ctx, logic_state, render_state);
+
+        #[cfg(debug_assertions)]
+        match self {
+            Binding::HotReload(b) => {
+                if b.active {
+                    unsafe {
+                        let call: Symbol<unsafe extern "C" fn(&egui::Context, &mut B::LogicState, &mut B::RenderState) -> OctaResult<()>> =
+                            b.lib_reloader.get_symbol("record_ui_commands")?;
+                        call(ctx, logic_state, render_state)
+                    }
+                } else {
+                    B::record_ui_commands(ctx, logic_state, render_state)
+                }
+            }
+            Binding::Static(_) => {
+                B::record_ui_commands(ctx, logic_state, render_state)
             }
         }
     }

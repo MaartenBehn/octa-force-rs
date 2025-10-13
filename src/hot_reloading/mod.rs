@@ -1,5 +1,5 @@
 use libloading::Symbol;
-use log::Log;
+use log::{LevelFilter, Log};
 use crate::hot_reloading::lib_reloader::LibReloader;
 use crate::OctaResult;
 
@@ -24,9 +24,9 @@ impl HotReloadController {
             hot_reload_config.lib_name, None, None)?;
         
         unsafe {
-            let call: Symbol<unsafe extern "C" fn(&'static dyn Log) -> OctaResult<()>> =
+            let call: Symbol<unsafe extern "C" fn(&'static dyn Log, LevelFilter) -> OctaResult<()>> =
                 lib_reloader.get_symbol("init_hot_reload")?;
-            call(log::logger())?;
+            call(log::logger(), log::max_level())?;
         }
         
         Ok(HotReloadController {

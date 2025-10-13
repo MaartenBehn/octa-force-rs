@@ -12,7 +12,7 @@ use crate::{
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::khr::{DynamicRendering, Synchronization2};
 
-use super::utils::uvec3_to_extend3d;
+use super::utils::{uvec2_to_offset3d, uvec3_to_extend3d};
 
 #[derive(Debug, Clone)]
 pub struct CommandPool {
@@ -406,6 +406,7 @@ impl CommandBuffer {
         src_layout: vk::ImageLayout,
         dst_image: &Image,
         dst_layout: vk::ImageLayout,
+        offset: UVec2,
     ) {
         let region = vk::ImageCopy::default()
             .src_subresource(vk::ImageSubresourceLayers {
@@ -420,7 +421,8 @@ impl CommandBuffer {
                 mip_level: 0,
                 layer_count: 1,
             })
-            .extent(uvec3_to_extend3d(src_image.size));
+            .extent(uvec3_to_extend3d(src_image.size))
+            .dst_offset(uvec2_to_offset3d(offset));
 
         unsafe {
             self.device.inner.cmd_copy_image(

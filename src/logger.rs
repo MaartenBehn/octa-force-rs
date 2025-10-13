@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 
-use log::{LevelFilter, Log};
-use simplelog::{ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode, WriteLogger};
+use log::{LevelFilter, Log, Metadata};
+use simplelog::{ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger, TerminalMode, WriteLogger};
 use crate::OctaResult;
 
 pub fn log_init() -> OctaResult<()> {
@@ -11,12 +11,13 @@ pub fn log_init() -> OctaResult<()> {
         .set_target_level(LevelFilter::Off)
         //.set_target_level(LevelFilter::Debug)
         .set_thread_level(LevelFilter::Off)
-        .add_filter_ignore(format!("{}", "sctk"))
-        .add_filter_ignore(format!("{}", "egui_ash_renderer"))
-        .add_filter_ignore(format!("{}", "egui_winit"))
-        .add_filter_ignore(format!("{}", "egui"))
-        .add_filter_ignore(format!("{}", "calloop"))
-        .add_filter_ignore(format!("{}", "arboard"))
+        .add_filter_ignore("sctk".to_string())
+        .add_filter_ignore("egui_ash_renderer".to_string())
+        .add_filter_ignore("egui_winit".to_string())
+        .add_filter_ignore("egui".to_string())
+        .add_filter_ignore("calloop".to_string())
+        .add_filter_ignore("arboard".to_string())
+        .add_filter_ignore("notify".to_string())
         .set_time_offset_to_local().expect("Failed to set Time Zone!")
         .build();
 
@@ -34,13 +35,12 @@ pub fn log_init() -> OctaResult<()> {
             File::create("trace.log")?
         ),
     ])?;
-
+    
     Ok(())
 }
 
-pub fn setup_logger(
-    logger: &'static dyn Log,
-) -> OctaResult<()> {
+pub fn setup_logger(logger: &'static dyn Log, level: LevelFilter) -> OctaResult<()> {
+    log::set_max_level(level);
     log::set_logger(logger)?;
     Ok(())
 }
