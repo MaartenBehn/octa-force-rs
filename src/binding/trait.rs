@@ -53,6 +53,9 @@ pub trait BindingTrait: fmt::Debug {
         logic_state: &mut Self::LogicState,
         render_state: &mut Self::RenderState,
     ) -> OctaResult<()> {
+        let _ = ctx;
+        let _ = logic_state;
+        let _ = render_state;
 
         Ok(())
     }

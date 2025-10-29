@@ -27,7 +27,6 @@ pub mod in_flight_frames;
 use anyhow::{bail, Context as _};
 use engine::{Engine, EngineConfig};
 use glam::UVec2;
-use gui::Gui;
 use std::{env, thread, time::{Duration, Instant}};
 use log::{error, info, trace, warn};
 use vulkan::{entry::Entry, utils::physicalsize_to_uvec2, *};

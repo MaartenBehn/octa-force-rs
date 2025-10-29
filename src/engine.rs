@@ -10,7 +10,6 @@ use crate::vulkan::Context;
 use crate::{OctaResult, SemaphoreSubmitInfo};
 use crate::{controls::Controls, gui::Gui, hot_reloading::HotReloadConfig, stats::FrameStats, CommandBuffer, CommandPool, Swapchain};
 
-use crate::stats::StatsDisplayMode;
 use ash::vk::{self};
 use winit::{
     dpi::PhysicalSize, event_loop::ActiveEventLoop, window::WindowAttributes
