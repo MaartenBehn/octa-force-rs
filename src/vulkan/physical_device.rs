@@ -571,7 +571,7 @@ macro_rules! set_from_list {
 
 impl<'a> PhysicalDeviceFeatures<'a> {
 
-    pub(crate) fn vulkan_features(&mut self) -> PhysicalDeviceFeatures2{
+    pub(crate) fn vulkan_features(&mut self) -> PhysicalDeviceFeatures2<'_>{
         let mut res = PhysicalDeviceFeatures2::default()
             .features(self.features);
 

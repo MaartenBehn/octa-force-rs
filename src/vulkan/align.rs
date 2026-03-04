@@ -78,7 +78,7 @@ impl<T> Align<T> {
         }
     }
 
-    pub fn iter_mut(&mut self) -> AlignIter<T> {
+    pub fn iter_mut(&mut self) -> AlignIter<'_, T> {
         AlignIter {
             current: self.start,
             align: self,

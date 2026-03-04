@@ -49,6 +49,16 @@ impl Fence {
         Ok(Self { device, inner })
     }
 
+    pub fn is_done(&self) -> Result<bool> {
+        let res = unsafe {
+            self.device
+                .inner
+                .get_fence_status(self.inner)?
+        };
+
+        Ok(res)
+    }
+
     pub fn wait(&self, timeout: Option<u64>) -> Result<()> {
         let timeout = timeout.unwrap_or(std::u64::MAX);
 

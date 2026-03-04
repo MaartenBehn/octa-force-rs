@@ -8,7 +8,7 @@ pkgs.mkShell {
     cmake
 
     # For performance profile
-    linuxPackages_latest.perf
+    perf
     hotspot
 
     # For dependency graph

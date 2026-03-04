@@ -364,6 +364,17 @@ impl CommandBuffer {
         };
     }
 
+    pub fn copy_buffer_regions(&self, src_buffer: &Buffer, dst_buffer: &Buffer, regions: &[vk::BufferCopy]) {
+        unsafe {
+            self.device.inner.cmd_copy_buffer(
+                self.inner,
+                src_buffer.inner,
+                dst_buffer.inner,
+                regions,
+            )
+        };
+    }
+
     pub fn pipeline_image_barriers(&self, barriers: &[ImageBarrier]) {
         let barriers = barriers
             .iter()

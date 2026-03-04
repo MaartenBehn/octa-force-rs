@@ -6,7 +6,7 @@ use gpu_allocator::{
     AllocatorDebugSettings,
 };
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use crate::{engine::EngineFeatureValue, vulkan::{device::Device, instance::Instance, queue::Queue, surface::Surface}, CommandBuffer, CommandPool, EngineConfig, RayTracingContext};
+use crate::{CommandBuffer, CommandPool, EngineConfig, RayTracingContext, engine::EngineFeatureValue, vulkan::{Fence, device::Device, instance::Instance, queue::Queue, surface::Surface}};
 
 #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
 use ash::extensions::khr::{DynamicRendering, Synchronization2};
@@ -35,11 +35,6 @@ pub struct Context {
 
     #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
     pub(crate) dynamic_rendering: DynamicRendering
-}
-
-pub struct AllocContext {
-    pub allocator: Arc<Mutex<Allocator>>,
-    pub device: Arc<Device>,
 }
 
 impl Context {
@@ -293,13 +288,6 @@ impl Context {
             #[cfg(any(vulkan_1_0, vulkan_1_1, vulkan_1_2))]
             dynamic_rendering
         })
-    }
-
-    pub fn get_alloc_context(&self) -> AllocContext {
-        AllocContext {
-            allocator: self.allocator.clone(),
-            device: self.device.clone(),
-        }
     }
 }
 

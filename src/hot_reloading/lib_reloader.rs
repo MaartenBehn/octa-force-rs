@@ -225,7 +225,7 @@ impl LibReloader {
     /// # Safety
     ///
     /// Users of this API must specify the correct type of the function or variable loaded.
-    pub unsafe fn get_symbol<T>(&self, name: &str) -> OctaResult<Symbol<T>> { unsafe {
+    pub unsafe fn get_symbol<T>(&self, name: &str) -> OctaResult<Symbol<'_, T>> { unsafe {
         match &self.lib {
             None => Err(anyhow!(format!("{name}(...) not found!"))),
             Some(lib) => Ok(lib.get(name.as_bytes())?),
